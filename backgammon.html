@@ -23,7 +23,8 @@
       justify-content: center;
       align-items: center;
       width: 100vw;
-      height: 100vh;
+      height: 100vh;   /* fallback */
+      height: 100dvh;  /* dynamic viewport height — excludes browser chrome on mobile */
       overflow: hidden;
     }
     canvas {
@@ -2303,12 +2304,21 @@ initBoard();
 
 // ── Canvas scaling — fits board into any screen size ──────────
 function resizeCanvas() {
-  const scale = Math.min(window.innerWidth / CW, window.innerHeight / CH, 1);
+  // visualViewport gives the truly visible area (excludes browser chrome,
+  // on-screen keyboard, etc.) — falls back to window dimensions on older browsers
+  const vw = (window.visualViewport ? window.visualViewport.width  : window.innerWidth);
+  const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const scale = Math.min(vw / CW, vh / CH, 1);
   canvas.style.width  = Math.round(CW * scale) + 'px';
   canvas.style.height = Math.round(CH * scale) + 'px';
 }
-window.addEventListener('resize', resizeCanvas);
-// orientationchange fires before dimensions update — small delay fixes it
+// Listen on visualViewport for reliable mobile resize events
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resizeCanvas);
+  window.visualViewport.addEventListener('scroll', resizeCanvas);
+} else {
+  window.addEventListener('resize', resizeCanvas);
+}
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
 
 // ── PWA: register service worker for offline play ─────────────
