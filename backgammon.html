@@ -176,7 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v2.3-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v2.4-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -310,7 +310,7 @@ let roomCode = null;
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v2.3-MP';
+const VERSION    = 'v2.4-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -379,11 +379,20 @@ function _listenForState() {
 }
 
 function _showStaticDice(vals) {
-  const cx = IX + PLAY_W/2, cy = IY + IH/2;
-  dicePhysics = vals.map((v,i) => ({
-    x: cx + (i===0?-22:22) + (vals.length>2?((i-1)*20):0),
-    y: cy, vx:0, vy:0, rotation:0, angularVel:0,
-    value:v, stopped:true, bounceCount:99, half:0
+  // Use right-half boundaries — same as initDicePhysics right side
+  const minX = BAR_X + BAR_W + DIE_SZ/2 + 2;
+  const maxX = BEAR_X - DIE_SZ/2 - 2;
+  const minY = IY + DIE_SZ/2 + 2;
+  const maxY = IY + IH - DIE_SZ/2 - 2;
+  const cx = (minX + maxX) / 2;
+  const cy = IY + IH / 2;
+  const n = vals.length;
+  dicePhysics = vals.map((v, i) => ({
+    x: n === 1 ? cx : cx + (i % 2 === 0 ? -18 : 18),
+    y: n <= 2 ? cy : (i < 2 ? cy - 20 : cy + 20),
+    vx:0, vy:0, rotation:0, angularVel:0,
+    value:v, stopped:true, bounceCount:99, half:1,
+    minX, maxX, minY, maxY
   }));
 }
 
@@ -1541,29 +1550,38 @@ function drawDiceArea() {
     const _cx = IX + HALF_W / 2;
 
     if (phase === 'opening') {
-      ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
-      ctx.fillText(_wn, _cx, gapCy - 6);
+      // Show white's name only to white (or singleplayer)
+      if (!myRole || myRole === 'white') {
+        ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillText(_wn, _cx, gapCy - 6);
+      }
       if (isMyTurn()) {
-        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
+        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
         ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
       }
     } else if (phase === 'opening_w_rolling') {
-      ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
-      ctx.fillText(_wn, _cx, gapCy - 6);
-      ctx.fillStyle=C.labelDim; ctx.font='11px Courier New';
+      if (!myRole || myRole === 'white') {
+        ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillText(_wn, _cx, gapCy - 6);
+      }
+      ctx.fillStyle=C.labelDim; ctx.font='11px Courier New'; ctx.textAlign='center';
       ctx.fillText('rolling...', _cx, gapCy + 18);
     } else if (phase === 'opening_b') {
-      ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
-      ctx.fillText(_bn, _cx, gapCy - 6);
+      // Show black's name only to black (or singleplayer)
+      if (!myRole || myRole === 'black') {
+        ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillText(_bn, _cx, gapCy - 6);
+      }
       if (isMyTurn()) {
-        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
+        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
         ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
       }
     } else if (phase === 'opening_b_rolling') {
-      // Both dice on board
-      ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
-      ctx.fillText(_bn, _cx, gapCy - 6);
-      ctx.fillStyle=C.labelDim; ctx.font='11px Courier New';
+      if (!myRole || myRole === 'black') {
+        ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillText(_bn, _cx, gapCy - 6);
+      }
+      ctx.fillStyle=C.labelDim; ctx.font='11px Courier New'; ctx.textAlign='center';
       ctx.fillText('rolling...', _cx, gapCy + 18);
     }
     return;
@@ -2368,8 +2386,14 @@ function drawBoard() {
 
   ctx.fillStyle=C.labelDim; ctx.font='bold 12px Courier New'; ctx.textAlign='left';
   ctx.fillText('BACKGAMMON',BX+8,BY+14);
-  ctx.font='9px Courier New'; ctx.fillStyle='rgba(180,140,60,0.5)';
-  ctx.fillText(VERSION, BX+8, BY+14+11);
+  // Version label: middle of left border, rotated 90°
+  ctx.save();
+  ctx.translate(BX + BORDER/2, BY + BH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.font='9px Courier New'; ctx.fillStyle='rgba(180,140,60,0.6)';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(VERSION, 0, 0);
+  ctx.restore();
   // ── Player flag + name in top/bottom border strips (above/below tray) ──
   const _brdFW=26, _brdFH=17;
   // Use the right portion of the bottom/top borders (over the tray area)
