@@ -176,7 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v2.5-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v2.6-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -310,7 +310,7 @@ let roomCode = null;
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v2.5-MP';
+const VERSION    = 'v2.6-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -475,6 +475,10 @@ document.addEventListener('DOMContentLoaded', () => {
       _listenForState(); // listen BEFORE launch so we get the initial state push from White
     });
   });
+  // Enter key in the room-code field triggers Join
+  document.getElementById('join-code').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('join-btn').click(); }
+  });
 });
 
 // ── Game state ───────────────────────────────────────────────
@@ -615,6 +619,29 @@ function playBlotHit() {
     sizzleG.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
     sizzleSrc.connect(hp); hp.connect(sizzleG); sizzleG.connect(a.destination);
     sizzleSrc.start(t);
+  } catch(e) {}
+}
+function playSafeDoorClose() {
+  try {
+    const a = ac(), t = a.currentTime;
+    // Heavy thud — low frequency slam
+    const o1 = a.createOscillator(), g1 = a.createGain();
+    o1.type = 'sine';
+    o1.frequency.setValueAtTime(160, t);
+    o1.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+    g1.gain.setValueAtTime(0.7, t); g1.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    o1.connect(g1); g1.connect(a.destination); o1.start(t); o1.stop(t + 0.4);
+    // Metallic ring — mid clang
+    const o2 = a.createOscillator(), g2 = a.createGain();
+    o2.type = 'square';
+    o2.frequency.setValueAtTime(1100, t); o2.frequency.exponentialRampToValueAtTime(320, t + 0.1);
+    g2.gain.setValueAtTime(0.22, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o2.connect(g2); g2.connect(a.destination); o2.start(t); o2.stop(t + 0.25);
+    // Short rattle
+    const o3 = a.createOscillator(), g3 = a.createGain();
+    o3.type = 'sawtooth'; o3.frequency.value = 340;
+    g3.gain.setValueAtTime(0.1, t + 0.03); g3.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o3.connect(g3); g3.connect(a.destination); o3.start(t + 0.03); o3.stop(t + 0.15);
   } catch(e) {}
 }
 function playClockTick() {
@@ -936,9 +963,14 @@ function drawDicePhysics() {
   for (let i = 0; i < dicePhysics.length; i++) {
     const die = dicePhysics[i];
     if (phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling') {
-      // Flicker random face while rolling
-      const flickerVal = Math.ceil(Math.random() * 6);
-      drawDieRotated(die.x, die.y, flickerVal, die.rotation);
+      if (die.stopped) {
+        // Already-settled die stays put with its real face
+        drawDie(die.x, die.y, die.value, false);
+      } else {
+        // Flicker random face while rolling
+        const flickerVal = Math.ceil(Math.random() * 6);
+        drawDieRotated(die.x, die.y, flickerVal, die.rotation);
+      }
     } else {
       // Rolled: show final value
       let used = false;
@@ -1842,7 +1874,13 @@ function triggerBillWinAnim(winner) {
 
 function updateBillSafeAnim(dt) {
   if (!billSafeAnim || billSafeAnim.done) return;
+  const prevT = billSafeAnim.t;
   billSafeAnim.t += dt;
+  // Play metal-door sound exactly once when the closing phase begins
+  if (!billSafeAnim._closeSoundPlayed && billSafeAnim.t >= SAFE_OPEN_DUR + SAFE_FLY_DUR && prevT < SAFE_OPEN_DUR + SAFE_FLY_DUR) {
+    billSafeAnim._closeSoundPlayed = true;
+    playSafeDoorClose();
+  }
   if (billSafeAnim.t >= billSafeAnim.duration) billSafeAnim.done = true;
 }
 
