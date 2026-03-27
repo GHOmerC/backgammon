@@ -143,26 +143,58 @@
       background: linear-gradient(135deg, #9a5e18, #dba84a);
       transform: translateX(-50%) scale(0.96);
     }
+    /* ── Multiplayer lobby styles ── */
+    #create-btn, #join-btn {
+      display: block; width: 100%; padding: 13px; margin-bottom: 8px;
+      background: linear-gradient(135deg, #7a4a10, #c9983a);
+      border: none; border-radius: 8px; color: #fff8e7;
+      font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold;
+      letter-spacing: 2px; cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #create-btn:hover, #join-btn:hover { background: linear-gradient(135deg, #9a5e18, #dba84a); }
+    #join-code {
+      display: block; width: 100%; box-sizing: border-box;
+      background: #1a1208; border: 1px solid #6a4a20; border-radius: 6px;
+      color: #e8c060; font-family: 'Courier New', monospace; font-size: 24px;
+      font-weight: bold; text-align: center; letter-spacing: 8px;
+      padding: 10px; margin-bottom: 8px; text-transform: uppercase;
+    }
+    #join-code:focus { border-color: #e0b84a; outline: none; }
+    #lobby-sep { text-align: center; color: #6a4a20; margin: 10px 0; font-size: 13px; letter-spacing: 3px; }
+    #waiting-room { display: none; text-align: center; padding-top: 6px; }
+    #waiting-room .wlabel { font-size: 12px; color: #b8a070; letter-spacing: 2px; }
+    #room-code-display { font-size: 42px; font-weight: bold; letter-spacing: 12px; color: #e8c060; margin: 10px 0 6px; }
+    #waiting-status { font-size: 12px; color: #888; letter-spacing: 1px; }
+    #mp-error { color: #ff7070; font-size: 12px; text-align: center; margin-top: 8px; min-height: 16px; }
   </style>
 </head>
+<!-- Firebase Realtime Database (compat API — works as global firebase.* object) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <body>
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p>ENTER PLAYER NAMES TO BEGIN</p>
+    <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
-      <label class="wlabel">⬜ White Player</label>
-      <input type="text" id="white-name" placeholder="Name (e.g. Omer)" maxlength="14"
+      <label class="wlabel">YOUR NAME</label>
+      <input type="text" id="my-name" placeholder="Name (e.g. Omer)" maxlength="14"
              autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
-      <select id="white-country"><option value="">— Country (optional) —</option></select>
+      <select id="my-country"><option value="">— Country (optional) —</option></select>
     </div>
-    <div class="setup-row">
-      <label class="blabel">⬛ Black Player</label>
-      <input type="text" id="black-name" placeholder="Name (e.g. Alex)" maxlength="14"
-             autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
-      <select id="black-country"><option value="">— Country (optional) —</option></select>
+    <div id="lobby-section">
+      <button id="create-btn">⬜  CREATE GAME  (play as White)</button>
+      <div id="lobby-sep">— or —</div>
+      <input type="text" id="join-code" placeholder="ROOM CODE" maxlength="4">
+      <button id="join-btn">⬛  JOIN GAME  (play as Black)</button>
     </div>
-    <button id="start-btn">▶  START GAME</button>
+    <div id="waiting-room">
+      <div class="wlabel">SHARE THIS CODE WITH YOUR OPPONENT</div>
+      <div id="room-code-display">----</div>
+      <div id="waiting-status">Waiting for opponent to join...</div>
+    </div>
+    <div id="mp-error"></div>
   </div>
 </div>
 <canvas id="c"></canvas>
@@ -261,24 +293,153 @@ const COUNTRY_LIST = [
 ];
 let players = { white:{name:'White',flag:''}, black:{name:'Black',flag:''} };
 
+// ── Multiplayer (Firebase) ─────────────────────────────────────
+const FB_CONFIG = {
+  apiKey: "AIzaSyDrJzS0uQ8-q6wFuaavJrZ9XX0aZl6LeIo",
+  authDomain: "backgammon-ac4d8.firebaseapp.com",
+  databaseURL: "https://backgammon-ac4d8-default-rtdb.firebaseio.com",
+  projectId: "backgammon-ac4d8",
+  storageBucket: "backgammon-ac4d8.firebasestorage.app",
+  messagingSenderId: "501077305874",
+  appId: "1:501077305874:web:2a7a089f2b2a6945bdc6cb"
+};
+let _fbDb = null, _fbRoom = null;
+let myRole = null;   // 'white' | 'black' — null until game starts
+let roomCode = null;
+let _applyingRemote = false;
+const _myId = Math.random().toString(36).slice(2, 10); // unique client ID
+
+function _fbInit() {
+  if (_fbDb) return;
+  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  _fbDb = firebase.database();
+}
+
+function _genCode() {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  return Array.from({length:4}, () => c[Math.floor(Math.random()*c.length)]).join('');
+}
+
+let _loopStarted = false;
+function _launchGame() {
+  document.getElementById('setup-overlay').style.display = 'none';
+  document.getElementById('c').style.display = 'block';
+  resizeCanvas();
+  document.getElementById('subtitle').textContent =
+    players.white.name + ' (White)  vs  ' + players.black.name + ' (Black)';
+  if (!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
+  if (_ac.state === 'suspended') _ac.resume();
+  loadDiceAudioBuffers();
+  if (!_loopStarted) { _loopStarted = true; initBoard(); phase = 'opening'; loop(); }
+}
+
+function _listenForState() {
+  _fbRoom.child('state').on('value', snap => {
+    const data = snap.val();
+    if (!data || data.sender === _myId) return; // skip own pushes
+    // Black: first state push from White launches the game
+    if (myRole === 'black' && document.getElementById('setup-overlay').style.display !== 'none') {
+      _launchGame();
+    }
+    _applyingRemote = true;
+    phase          = data.phase;
+    currentPlayer  = data.currentPlayer;
+    if (data.points) data.points.forEach((p,i) => { points[i].color=p.color; points[i].count=p.count; });
+    bar.white=data.bar.white; bar.black=data.bar.black;
+    off.white=data.off.white; off.black=data.off.black;
+    dice       = data.dice      || [];
+    movesLeft  = data.movesLeft || [];
+    gameScore.white=data.gameScore.white; gameScore.black=data.gameScore.black;
+    openingDice = data.openingDice || [];
+    selectedPoint=null; highlights=[]; combinedHighlights=[];
+    // Show static dice for remote roll (no physics animation needed)
+    if (dice.length > 0 && (phase==='rolled'||phase==='idle')) _showStaticDice(dice);
+    else if (phase !== 'rolling' && phase !== 'opening_w_rolling' && phase !== 'opening_b_rolling') dicePhysics = [];
+    _applyingRemote = false;
+  });
+}
+
+function _showStaticDice(vals) {
+  const cx = IX + PLAY_W/2, cy = IY + IH/2;
+  dicePhysics = vals.map((v,i) => ({
+    x: cx + (i===0?-22:22) + (vals.length>2?((i-1)*20):0),
+    y: cy, vx:0, vy:0, rotation:0, angularVel:0,
+    value:v, stopped:true, bounceCount:99, half:0
+  }));
+}
+
+function pushState() {
+  if (!_fbRoom || _applyingRemote) return;
+  _fbRoom.child('state').set({
+    sender: _myId, phase, currentPlayer,
+    points: points.map(p => ({color:p.color||null, count:p.count})),
+    bar: {white:bar.white, black:bar.black},
+    off: {white:off.white, black:off.black},
+    dice: [...dice], movesLeft: [...movesLeft],
+    gameScore: {white:gameScore.white, black:gameScore.black},
+    openingDice: [...openingDice]
+  });
+}
+
+function isMyTurn() {
+  if (!myRole) return true; // singleplayer — always allowed
+  if (phase==='opening')   return myRole==='white';
+  if (phase==='opening_b') return myRole==='black';
+  return myRole === currentPlayer;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const opts = COUNTRY_LIST.map(c=>`<option value="${c.c}">${c.f} ${c.n}</option>`).join('');
-  document.getElementById('white-country').innerHTML += opts;
-  document.getElementById('black-country').innerHTML += opts;
-  document.getElementById('start-btn').addEventListener('click', () => {
-    const wn = document.getElementById('white-name').value.trim() || 'White';
-    const bn = document.getElementById('black-name').value.trim() || 'Black';
-    players.white = {name:wn, flag:document.getElementById('white-country').value};
-    players.black = {name:bn, flag:document.getElementById('black-country').value};
-    document.getElementById('setup-overlay').style.display = 'none';
-    document.getElementById('c').style.display = 'block';
-    resizeCanvas();
-    document.getElementById('subtitle').textContent = wn + ' (White)  vs  ' + bn + ' (Black)';
-    // Pre-warm AudioContext on this user gesture so first dice roll plays instantly
-    if (!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
-    if (_ac.state === 'suspended') _ac.resume();
-    loadDiceAudioBuffers(); // pre-load dice audio files as AudioBuffers
-    loop();
+  document.getElementById('my-country').innerHTML += opts;
+
+  const errEl = document.getElementById('mp-error');
+  function showErr(msg) { errEl.textContent = msg; }
+
+  document.getElementById('create-btn').addEventListener('click', () => {
+    const name = document.getElementById('my-name').value.trim() || 'White';
+    const flag = document.getElementById('my-country').value;
+    showErr('');
+    _fbInit();
+    roomCode = _genCode();
+    _fbRoom  = _fbDb.ref('rooms/' + roomCode);
+    myRole   = 'white';
+    players.white = {name, flag};
+    players.black = {name:'...', flag:''};
+    _fbRoom.child('players/white').set({name, flag});
+    // Show waiting room
+    document.getElementById('lobby-section').style.display = 'none';
+    document.getElementById('room-code-display').textContent = roomCode;
+    document.getElementById('waiting-room').style.display = 'block';
+    // Wait for Black to join
+    _fbRoom.child('players/black').on('value', snap => {
+      const bl = snap.val();
+      if (!bl || !bl.name || bl.name === '...') return;
+      _fbRoom.child('players/black').off('value'); // stop listening for join
+      players.black = {name: bl.name, flag: bl.flag||''};
+      _launchGame();
+      _listenForState();
+      pushState(); // White pushes initial board state
+    });
+  });
+
+  document.getElementById('join-btn').addEventListener('click', () => {
+    const name = document.getElementById('my-name').value.trim() || 'Black';
+    const flag = document.getElementById('my-country').value;
+    const code = (document.getElementById('join-code').value||'').trim().toUpperCase();
+    if (code.length !== 4) { showErr('Please enter a 4-letter room code.'); return; }
+    showErr('Joining...');
+    _fbInit();
+    roomCode = code;
+    _fbRoom  = _fbDb.ref('rooms/' + roomCode);
+    _fbRoom.child('players/white').once('value', snap => {
+      const wh = snap.val();
+      if (!wh || !wh.name) { showErr('Room not found. Check the code and try again.'); return; }
+      myRole = 'black';
+      players.white = {name: wh.name, flag: wh.flag||''};
+      players.black = {name, flag};
+      _fbRoom.child('players/black').set({name, flag});
+      _listenForState(); // listen BEFORE launch so we get the initial state push from White
+    });
   });
 });
 
@@ -966,6 +1127,7 @@ function endTurn() {
   selectedPoint = null; highlights = []; combinedHighlights = []; skipTimer = 0;
   dicePhysics = [];
   turnTimer = TURN_FRAMES;
+  pushState(); // tell opponent: your turn now
 }
 
 // Feature 6: get visual position of top checker at a point
@@ -1105,6 +1267,7 @@ function executeMoveFinal(fromPt, toPt, skipLegalCheck = false) {
       gameScore[cp] += isGammon ? 2 : 1;
       phase='gameover'; statusMsg=(cp==='white'?'WHITE':'BLACK')+(isGammon?' GAMMON!':' WINS!');
       statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(cp); turnTimer=-1;
+      pushState();
     }
     else if (movesLeft.length === 0) { endTurn(); }
     else if (!skipLegalCheck && !hasAnyLegalMove()) { statusMsg='No further moves — turn passed'; statusTimer=90; skipTimer=90; playDisappointment(); }
@@ -1128,7 +1291,8 @@ function executeMoveFinal(fromPt, toPt, skipLegalCheck = false) {
   selectedPoint = null; highlights = []; combinedHighlights = [];
 
   if (movesLeft.length === 0) { endTurn(); }
-  else if (!skipLegalCheck && !hasAnyLegalMove()) { statusMsg='No further moves — turn passed'; statusTimer=90; skipTimer=90; playDisappointment(); }
+  else if (!skipLegalCheck && !hasAnyLegalMove()) { statusMsg='No further moves — turn passed'; statusTimer=90; skipTimer=90; playDisappointment(); pushState(); }
+  else { pushState(); } // partial move — sync board to opponent
 }
 
 // ── Utilities ─────────────────────────────────────────────────
@@ -1319,6 +1483,22 @@ function drawSelectionRing() {
   ctx.restore();
 }
 
+// ── Multiplayer: "Waiting for opponent" message ───────────────
+function drawOpponentWaiting() {
+  if (!myRole) return; // singleplayer — nothing to show
+  if (isMyTurn()) return; // it IS my turn — nothing to show
+  if (phase === 'gameover' || phase === 'title') return;
+  const oppName = myRole === 'white' ? players.black.name : players.white.name;
+  const cx = IX + PLAY_W/2, cy = IY + IH/2;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  roundRect(cx - 140, cy - 18, 280, 36, 8); ctx.fill();
+  ctx.fillStyle = '#e8d080'; ctx.font = 'bold 14px Courier New';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Waiting for ' + oppName + '...', cx, cy);
+  ctx.restore();
+}
+
 // ── Dice area (banner + press R + moves left counter) ─────────
 function drawDiceArea() {
   const gapTop=TOP_BASE+PT_H+4, gapBot=BOT_BASE-PT_H-4, gapCy=(gapTop+gapBot)/2;
@@ -1504,87 +1684,146 @@ function drawDollarBill() {
 }
 
 // ── Safe box (win animation) ───────────────────────────────────
-function drawSafeBox(cx, cy) {
-  const w=58, h=48;
+// Phase durations in frames (~60fps): open door → bill flies in → close door
+const SAFE_OPEN_DUR  = 60;
+const SAFE_FLY_DUR   = 150;  // 2× slower flight
+const SAFE_CLOSE_DUR = 60;
+// openFraction: 0=closed, 1=fully open. Uses cosine to simulate door swinging out.
+function drawSafeBox(cx, cy, openFraction, dialAngle) {
+  openFraction = openFraction || 0;
+  dialAngle    = dialAngle    || 0;
+  const w=58, h=48, dp=5;
   ctx.save();
   ctx.shadowColor='rgba(0,0,0,0.55)'; ctx.shadowBlur=10; ctx.shadowOffsetX=2; ctx.shadowOffsetY=4;
+  // Body
   const g=ctx.createLinearGradient(cx-w/2,cy-h/2,cx+w/2,cy+h/2);
   g.addColorStop(0,'#8a8a8a'); g.addColorStop(0.25,'#606060'); g.addColorStop(0.6,'#3a3a3a'); g.addColorStop(1,'#1c1c1c');
   roundRect(cx-w/2,cy-h/2,w,h,5); ctx.fillStyle=g; ctx.fill();
   ctx.shadowBlur=0; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0;
   roundRect(cx-w/2,cy-h/2,w,h,5); ctx.strokeStyle='#aaa'; ctx.lineWidth=1.5; ctx.stroke();
-  // Recessed door panel
-  const dp=5;
-  roundRect(cx-w/2+dp,cy-h/2+dp,w-dp*2,h-dp*2,3);
-  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fill();
-  ctx.strokeStyle='#555'; ctx.lineWidth=0.7; ctx.stroke();
-  // Hinge marks (left side)
-  [cy-h*0.22, cy+h*0.22].forEach(hy => {
-    roundRect(cx-w/2,hy-3,6,6,1); ctx.fillStyle='#777'; ctx.fill();
-    ctx.strokeStyle='#999'; ctx.lineWidth=0.5; ctx.stroke();
-  });
-  // Combination dial
-  const dr=h*0.22;
-  const dg=ctx.createRadialGradient(cx-7,cy,0,cx-7,cy,dr);
-  dg.addColorStop(0,'#888'); dg.addColorStop(0.6,'#555'); dg.addColorStop(1,'#2a2a2a');
-  ctx.beginPath(); ctx.arc(cx-7,cy,dr,0,Math.PI*2); ctx.fillStyle=dg; ctx.fill();
-  ctx.strokeStyle='#aaa'; ctx.lineWidth=1; ctx.stroke();
-  for (let a=0; a<Math.PI*2; a+=Math.PI/4) {
-    ctx.beginPath();
-    ctx.moveTo(cx-7+Math.cos(a)*(dr-2),cy+Math.sin(a)*(dr-2));
-    ctx.lineTo(cx-7+Math.cos(a)*dr,cy+Math.sin(a)*dr);
-    ctx.strokeStyle='#ccc'; ctx.lineWidth=0.8; ctx.stroke();
+  // Interior (revealed as door opens)
+  if (openFraction > 0) {
+    roundRect(cx-w/2+dp, cy-h/2+dp, w-dp*2, h-dp*2, 3);
+    ctx.fillStyle='#0a0a0a'; ctx.fill();
+    // Stacked bills inside safe — visible when open
+    if (openFraction > 0.5) {
+      const ia = Math.min(1, (openFraction - 0.5) / 0.5);
+      ctx.globalAlpha = ia * 0.9;
+      for (let i = 0; i < 3; i++) {
+        drawBillGraphic(cx - w/2 + dp + 1, cy - 4 + i * 4, w - dp*2 - 2, 8, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
   }
-  ctx.beginPath(); ctx.arc(cx-7,cy,dr*0.32,0,Math.PI*2);
-  ctx.fillStyle='#222'; ctx.fill(); ctx.strokeStyle='#666'; ctx.lineWidth=0.5; ctx.stroke();
-  // Handle bar (right)
-  ctx.strokeStyle='#ddd'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.beginPath(); ctx.moveTo(cx+13,cy-7); ctx.lineTo(cx+22,cy-7);
-  ctx.lineTo(cx+22,cy+7); ctx.lineTo(cx+13,cy+7); ctx.stroke();
-  // Bill slot (top of door)
-  const slotY=cy-h/2+dp+3;
-  roundRect(cx-14,slotY,28,4,1); ctx.fillStyle='#111'; ctx.fill();
-  ctx.strokeStyle='#444'; ctx.lineWidth=0.5; ctx.stroke();
-  // Label
-  ctx.fillStyle='#888'; ctx.font='bold 9px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('$', cx+7, cy+1);
+  // Door panel — cosine compression simulates perspective swing (hinge on left)
+  const doorFullW = w - dp*2;
+  const doorW = doorFullW * Math.cos(openFraction * Math.PI / 2);
+  if (doorW > 1) {
+    roundRect(cx - w/2 + dp, cy - h/2 + dp, doorW, h - dp*2, 3);
+    ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fill();
+    ctx.strokeStyle='#555'; ctx.lineWidth=0.7; ctx.stroke();
+    // Hinge marks on left (always at body edge)
+    [cy-h*0.22, cy+h*0.22].forEach(hy => {
+      roundRect(cx-w/2, hy-3, 6, 6, 1); ctx.fillStyle='#777'; ctx.fill();
+      ctx.strokeStyle='#999'; ctx.lineWidth=0.5; ctx.stroke();
+    });
+    // Combination dial (fades as door opens)
+    const dialAlpha = Math.cos(openFraction * Math.PI / 2);
+    if (dialAlpha > 0.05) {
+      const dr = h * 0.22, dcx = cx - 7;
+      ctx.globalAlpha = dialAlpha;
+      const dg = ctx.createRadialGradient(dcx,cy,0,dcx,cy,dr);
+      dg.addColorStop(0,'#888'); dg.addColorStop(0.6,'#555'); dg.addColorStop(1,'#2a2a2a');
+      ctx.beginPath(); ctx.arc(dcx, cy, dr, 0, Math.PI*2); ctx.fillStyle=dg; ctx.fill();
+      ctx.strokeStyle='#aaa'; ctx.lineWidth=1; ctx.stroke();
+      // Spinning notches
+      for (let a=0; a<Math.PI*2; a+=Math.PI/4) {
+        const na = a + dialAngle;
+        ctx.beginPath();
+        ctx.moveTo(dcx+Math.cos(na)*(dr-2), cy+Math.sin(na)*(dr-2));
+        ctx.lineTo(dcx+Math.cos(na)*dr,     cy+Math.sin(na)*dr);
+        ctx.strokeStyle='#ccc'; ctx.lineWidth=0.8; ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(dcx, cy, dr*0.32, 0, Math.PI*2);
+      ctx.fillStyle='#222'; ctx.fill(); ctx.strokeStyle='#666'; ctx.lineWidth=0.5; ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // Handle bar (fades as door opens)
+    if (doorW > doorFullW * 0.35) {
+      ctx.globalAlpha = Math.min(1, (doorW / doorFullW - 0.35) / 0.65);
+      ctx.strokeStyle='#ddd'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath(); ctx.moveTo(cx+13,cy-7); ctx.lineTo(cx+22,cy-7);
+      ctx.lineTo(cx+22,cy+7); ctx.lineTo(cx+13,cy+7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // Bill slot (top of door)
+    const slotY = cy - h/2 + dp + 3;
+    roundRect(cx-14, slotY, 28, 4, 1); ctx.fillStyle='#111'; ctx.fill();
+    ctx.strokeStyle='#444'; ctx.lineWidth=0.5; ctx.stroke();
+    // $ label
+    ctx.fillStyle='#888'; ctx.font='bold 9px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('$', cx+7, cy+1);
+  }
   ctx.restore();
 }
 
 function triggerBillWinAnim(winner) {
   const pos = billTrayPos();
-  // Safe appears in the gameover overlay, to the right of the winner's name row
   const gcx = IX + PLAY_W / 2, gcy = IY + IH / 2;
-  const safeX = gcx + 130; // right side of overlay panel
+  const safeX = gcx + 70;
   const safeY = (winner === 'white') ? gcy + 18 : gcy + 54;
   billSafeAnim = {
     fromX: pos.x + (BEAR_W-10)/2, fromY: pos.y,
     safeX, safeY, winner,
-    t: 0, duration: 90, done: false
+    t: 0,
+    duration: SAFE_OPEN_DUR + SAFE_FLY_DUR + SAFE_CLOSE_DUR,
+    done: false
   };
 }
 
-function updateBillSafeAnim() {
+function updateBillSafeAnim(dt) {
   if (!billSafeAnim || billSafeAnim.done) return;
-  billSafeAnim.t++;
+  billSafeAnim.t += dt;
   if (billSafeAnim.t >= billSafeAnim.duration) billSafeAnim.done = true;
 }
 
 function drawBillSafeAnim() {
   if (!billSafeAnim) return;
   const a = billSafeAnim;
-  // Draw the safe (always visible once triggered)
-  drawSafeBox(a.safeX, a.safeY);
-  if (a.done) return;
-  const p = Math.min(1, a.t / a.duration);
-  const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
-  // Bill shrinks + fades as it enters the slot
-  const scale = 1 - ease * 0.65;
-  const bw = 80 * scale, bh = 34 * scale;
-  const bx = a.fromX + (a.safeX - a.fromX) * ease - bw/2;
-  const by = a.fromY + (a.safeY - a.fromY) * ease - bh/2;
-  const alpha = p < 0.72 ? 1 : 1 - (p-0.72)/0.28;
-  drawBillGraphic(bx, by, bw, bh, alpha);
+  const t = Math.min(a.t, a.duration);
+  const D1 = SAFE_OPEN_DUR, D2 = SAFE_FLY_DUR, D3 = SAFE_CLOSE_DUR;
+
+  let openFraction, dialAngle;
+  if (t < D1) {
+    // Phase 1: door swings open
+    const p = t / D1;
+    openFraction = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    dialAngle = p * Math.PI * 6;  // 3 full spins
+  } else if (t < D1 + D2) {
+    // Phase 2: door fully open, bill flying
+    openFraction = 1;
+    dialAngle = Math.PI * 6;
+  } else {
+    // Phase 3: door swings shut
+    const p = (t - D1 - D2) / D3;
+    const ep = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    openFraction = 1 - ep;
+    dialAngle = Math.PI * 6;
+  }
+
+  drawSafeBox(a.safeX, a.safeY, openFraction, dialAngle);
+
+  // Draw flying bill only during phase 2
+  if (!a.done && t >= D1 && t < D1 + D2) {
+    const p = (t - D1) / D2;
+    const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    const scale = 1 - ease * 0.65;
+    const bw = 160 * scale, bh = 68 * scale;  // 2× bigger than original 80×34
+    const bx = a.fromX + (a.safeX - a.fromX) * ease - bw/2;
+    const by = a.fromY + (a.safeY - a.fromY) * ease - bh/2;
+    const alpha = p < 0.72 ? 1 : 1 - (p - 0.72) / 0.28;
+    drawBillGraphic(bx, by, bw, bh, alpha);
+  }
 }
 
 // ── Title screen ─────────────────────────────────────────────
@@ -2038,7 +2277,7 @@ function drawBoard() {
   drawMedallion(); drawPoints(); drawBar(); drawBearOff();
   drawQuadrantLabels(); drawPointLabels();
   drawAllHighlights(); drawAllCheckers(); drawMovableGlows(); drawSelectionRing();
-  drawDiceArea(); drawClock();
+  drawDiceArea(); drawClock(); drawOpponentWaiting();
 
   // Feature 1: draw physics dice on top of board
   if (phase === 'rolling' || phase === 'rolled' || phase === 'opening_w_rolling' || phase === 'opening_b' || phase === 'opening_b_rolling') {
@@ -2079,24 +2318,25 @@ function drawBoard() {
   if(phase==='gameover'){
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(IX,IY,PLAY_W,IH);
     const gcx=IX+PLAY_W/2, gcy=IY+IH/2;
-    ctx.fillStyle='rgba(20,15,5,0.92)'; roundRect(gcx-185,gcy-65,370,155,12); ctx.fill();
-    ctx.strokeStyle=C.ptGoldHi; ctx.lineWidth=2; roundRect(gcx-185,gcy-65,370,155,12); ctx.stroke();
+    // Box slightly wider (420px) to fit: [flag] [name] [safe] [score]
+    ctx.fillStyle='rgba(20,15,5,0.92)'; roundRect(gcx-210,gcy-65,420,155,12); ctx.fill();
+    ctx.strokeStyle=C.ptGoldHi; ctx.lineWidth=2; roundRect(gcx-210,gcy-65,420,155,12); ctx.stroke();
     ctx.fillStyle=C.ptGoldHi; ctx.font='bold 28px Courier New'; ctx.textAlign='center';
     ctx.fillText(statusMsg,gcx,gcy-22);
-    // White player row
-    if (players.white.flag) drawCanvasFlag(players.white.flag, gcx-177, gcy+2, 38, 25);
-    const _wNameX = players.white.flag ? gcx-130 : gcx-170;
+    // White player row — flag | name | (safe drawn by drawBillSafeAnim) | score
+    if (players.white.flag) drawCanvasFlag(players.white.flag, gcx-200, gcy+2, 38, 25);
+    const _wNameX = players.white.flag ? gcx-153 : gcx-200;
     ctx.font='bold 16px Courier New'; ctx.textAlign='left';
-    ctx.fillStyle=C.wBase; ctx.fillText(players.white.name.substring(0,12)+' (white)', _wNameX, gcy+18);
+    ctx.fillStyle=C.wBase; ctx.fillText(players.white.name.substring(0,9)+' (white)', _wNameX, gcy+18);
     ctx.font='bold 22px Courier New';
-    ctx.fillText(gameScore.white, gcx+115, gcy+18);
+    ctx.fillText(gameScore.white, gcx+148, gcy+18);
     // Black player row
-    if (players.black.flag) drawCanvasFlag(players.black.flag, gcx-177, gcy+38, 38, 25);
-    const _bNameX = players.black.flag ? gcx-130 : gcx-170;
+    if (players.black.flag) drawCanvasFlag(players.black.flag, gcx-200, gcy+38, 38, 25);
+    const _bNameX = players.black.flag ? gcx-153 : gcx-200;
     ctx.font='bold 16px Courier New'; ctx.textAlign='left';
-    ctx.fillStyle='#c8ccff'; ctx.fillText(players.black.name.substring(0,12)+' (black)', _bNameX, gcy+54);
+    ctx.fillStyle='#c8ccff'; ctx.fillText(players.black.name.substring(0,9)+' (black)', _bNameX, gcy+54);
     ctx.font='bold 22px Courier New';
-    ctx.fillText(gameScore.black, gcx+115, gcy+54);
+    ctx.fillText(gameScore.black, gcx+148, gcy+54);
     ctx.font='11px Courier New'; ctx.fillStyle=C.labelDim; ctx.textAlign='center';
     ctx.fillText('Press  R  to play again',gcx,gcy+80);
   }
@@ -2127,7 +2367,7 @@ function update(dt) {
   if(statusTimer>0) statusTimer -= dt;
   // Always update visual effects (even during auto-skip pauses)
   if (fireworks.length > 0 || fireworkBurstQueue.length > 0) updateFireworks();
-  if (billSafeAnim && !billSafeAnim.done) updateBillSafeAnim();
+  if (billSafeAnim && !billSafeAnim.done) updateBillSafeAnim(dt);
   if(skipTimer>0){ skipTimer -= dt; if(skipTimer<=0){ skipTimer=0; endTurn(); } return; }
 
   // Blot animation — hit checker sliding to bar
@@ -2163,7 +2403,7 @@ function update(dt) {
       gameScore[opp] += 2; // forfeit = gammon (2 pts)
       phase='gameover'; statusMsg=(currentPlayer==='white'?'WHITE':'BLACK')+' FORFEITS!';
       statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(opp);
-      turnTimer=-1;
+      turnTimer=-1; pushState();
     }
   }
 
@@ -2173,6 +2413,7 @@ function update(dt) {
       phase = 'opening_b';
       statusMsg = (players.white.name||'White') + ' rolled ' + openingDice[0] + '!';
       statusTimer = 90;
+      pushState(); // tell Black: your turn to roll
     }
   }
   // Opening roll — black's die settles, resolve winner
@@ -2183,6 +2424,7 @@ function update(dt) {
         statusMsg = 'TIE  —  Roll Again!'; statusTimer = 140;
         dicePhysics = []; dice = []; movesLeft = [];
         phase = 'opening';
+        pushState(); // tell White: tie, roll again
       } else {
         currentPlayer = wd > bd ? 'white' : 'black';
         dice = [wd, bd]; movesLeft = [wd, bd];
@@ -2193,6 +2435,7 @@ function update(dt) {
           statusMsg='No legal moves — turn passed'; statusTimer=100; skipTimer=100;
           playDisappointment();
         }
+        pushState(); // tell both: game begins, first player set
       }
     }
   }
@@ -2205,6 +2448,7 @@ function update(dt) {
         statusMsg='No legal moves — turn passed'; statusTimer=100; skipTimer=100;
         playDisappointment();
       }
+      pushState(); // tell opponent: dice result + board is yours to watch
     }
   }
 }
@@ -2229,9 +2473,9 @@ document.addEventListener('keydown', e => {
   if(e.key==='r'||e.key==='R'){
     if(phase==='title'){ initBoard(); phase='opening'; }
     else if(phase==='gameover'){ initBoard(); phase='title'; }
-    else if(phase==='opening'){ rollOpeningWhite(); }
-    else if(phase==='opening_b'){ rollOpeningBlack(); }
-    else { rollDice(); }
+    else if(phase==='opening'  && isMyTurn()){ rollOpeningWhite(); }
+    else if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); }
+    else if(isMyTurn()){ rollDice(); }
   }
   if(e.key==='Escape'){ selectedPoint=null; highlights=[]; combinedHighlights=[]; }
 });
@@ -2239,8 +2483,10 @@ document.addEventListener('keydown', e => {
 // ── Shared board tap/click handler ────────────────────────────
 function handleBoardTap(clientX, clientY) {
   if(phase==='title'){ initBoard(); phase='opening'; return; }
-  if(phase==='opening'){ rollOpeningWhite(); return; }
-  if(phase==='opening_b'){ rollOpeningBlack(); return; }
+  if(phase==='opening'  && isMyTurn()){ rollOpeningWhite(); return; }
+  if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); return; }
+  if((phase==='opening'||phase==='opening_b') && !isMyTurn()) return;
+  if(!isMyTurn()) return;
   if(phase!=='rolled'||skipTimer>0) return;
   if(checkerAnim && !checkerAnim.done) return;
 
@@ -2309,9 +2555,9 @@ function updateRollButton() {
 _rollBtn && _rollBtn.addEventListener('click', () => {
   if(phase==='title'){ initBoard(); phase='opening'; }
   else if(phase==='gameover'){ initBoard(); phase='title'; }
-  else if(phase==='opening'){ rollOpeningWhite(); }
-  else if(phase==='opening_b'){ rollOpeningBlack(); }
-  else if(phase==='idle'){ rollDice(); }
+  else if(phase==='opening'  && isMyTurn()){ rollOpeningWhite(); }
+  else if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); }
+  else if(phase==='idle'     && isMyTurn()){ rollDice(); }
 });
 
 initBoard();
