@@ -2120,23 +2120,25 @@ function drawBoard() {
 }
 
 // ── Game loop ─────────────────────────────────────────────────
-function update() {
-  time++;
-  if(statusTimer>0) statusTimer--;
+function update(dt) {
+  // dt = elapsed time in 60fps-frame units (1.0 at 60fps, 0.5 at 120fps, 2.0 at 30fps)
+  // This makes all timers frame-rate independent
+  time += dt;
+  if(statusTimer>0) statusTimer -= dt;
   // Always update visual effects (even during auto-skip pauses)
   if (fireworks.length > 0 || fireworkBurstQueue.length > 0) updateFireworks();
   if (billSafeAnim && !billSafeAnim.done) updateBillSafeAnim();
-  if(skipTimer>0){ skipTimer--; if(skipTimer===0) endTurn(); return; }
+  if(skipTimer>0){ skipTimer -= dt; if(skipTimer<=0){ skipTimer=0; endTurn(); } return; }
 
   // Blot animation — hit checker sliding to bar
   if (blotAnim) {
-    blotAnim.t++;
+    blotAnim.t += dt;
     if (blotAnim.t >= blotAnim.duration) blotAnim = null;
   }
 
   // Feature 6: checker animation — supports N-leg chains via remainingPath
   if (checkerAnim && !checkerAnim.done) {
-    checkerAnim.t++;
+    checkerAnim.t += dt;
     if (checkerAnim.t >= checkerAnim.duration) {
       const fp = checkerAnim.fromPt, tp = checkerAnim.toPt;
       const remaining = checkerAnim.remainingPath || [];
@@ -2153,10 +2155,10 @@ function update() {
     playDisappointment();
   }
 
-  // Chess clock — 5-minute turn timer, visible after first 30 seconds
+  // Chess clock — frame-rate independent via dt scaling
   if ((phase==='idle'||phase==='rolling'||phase==='rolled') && turnTimer > 0) {
-    turnTimer--;
-    if (turnTimer === 0 && !checkerAnim) {
+    turnTimer -= dt;
+    if (turnTimer <= 0 && !checkerAnim) {
       const opp = currentPlayer==='white'?'black':'white';
       gameScore[opp] += 2; // forfeit = gammon (2 pts)
       phase='gameover'; statusMsg=(currentPlayer==='white'?'WHITE':'BLACK')+' FORFEITS!';
@@ -2207,7 +2209,20 @@ function update() {
   }
 }
 
-function loop(){ update(); ctx.clearRect(0,0,CW,CH); if(phase==='title') drawTitleScreen(); else drawBoard(); if(fireworks.length>0||fireworkBurstQueue.length>0) drawFireworks(); if(billSafeAnim) drawBillSafeAnim(); updateRollButton(); requestAnimationFrame(loop); }
+let _lastFrameTs = 0;
+function loop(now) {
+  // Compute dt in 60fps-frame units regardless of actual refresh rate
+  // Cap at 3 frames to avoid a huge jump after tab switching or backgrounding
+  const dt = _lastFrameTs ? Math.min((now - _lastFrameTs) * 60 / 1000, 3) : 1;
+  _lastFrameTs = now;
+  update(dt);
+  ctx.clearRect(0,0,CW,CH);
+  if(phase==='title') drawTitleScreen(); else drawBoard();
+  if(fireworks.length>0||fireworkBurstQueue.length>0) drawFireworks();
+  if(billSafeAnim) drawBillSafeAnim();
+  updateRollButton();
+  requestAnimationFrame(loop);
+}
 
 // ── Input ─────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
