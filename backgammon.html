@@ -176,6 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
+    <p id="version-label" style="font-size:7px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-18px;">v2.2-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -1530,23 +1531,24 @@ function drawDiceArea() {
     const _cx = IX + HALF_W / 2;
 
     if (phase === 'opening') {
-      // Show white player name large, prompt to roll
       ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
       ctx.fillText(_wn, _cx, gapCy - 6);
-      ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
-      ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
+      if (isMyTurn()) {
+        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
+        ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
+      }
     } else if (phase === 'opening_w_rolling') {
-      // White rolling
       ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
       ctx.fillText(_wn, _cx, gapCy - 6);
       ctx.fillStyle=C.labelDim; ctx.font='11px Courier New';
       ctx.fillText('rolling...', _cx, gapCy + 18);
     } else if (phase === 'opening_b') {
-      // White die stays; now show black player name, prompt to roll
       ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
       ctx.fillText(_bn, _cx, gapCy - 6);
-      ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
-      ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
+      if (isMyTurn()) {
+        ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New';
+        ctx.fillText('Press  R  to roll your dice', _cx, gapCy + 22);
+      }
     } else if (phase === 'opening_b_rolling') {
       // Both dice on board
       ctx.fillStyle='#c0c4ff'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
@@ -1566,7 +1568,7 @@ function drawDiceArea() {
   const _colorWord = isW ? 'white' : 'black';
   ctx.fillText(_pn.name.substring(0,12) + ' plays ' + _colorWord, bX+bW/2, bY+18);
 
-  if (phase==='idle') {
+  if (phase==='idle' && isMyTurn()) {
     ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
     ctx.fillText('Press  R  to roll your dice', IX+HALF_W/2, gapCy+6);
   } else if (phase==='rolled' && movesLeft.length > 0) {
