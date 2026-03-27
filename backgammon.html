@@ -354,6 +354,7 @@ function _listenForState() {
     selectedPoint=null; highlights=[]; combinedHighlights=[];
     // Show static dice for remote roll (no physics animation needed)
     if (dice.length > 0 && (phase==='rolled'||phase==='idle')) _showStaticDice(dice);
+    else if (phase === 'opening_b' && openingDice[0]) _showStaticDice([openingDice[0]]);
     else if (phase !== 'rolling' && phase !== 'opening_w_rolling' && phase !== 'opening_b_rolling') dicePhysics = [];
     _applyingRemote = false;
   });
@@ -1429,6 +1430,7 @@ function drawAllHighlights() {
 // ── Glow rings on all checkers that have a legal move (pre-selection) ─────
 function drawMovableGlows() {
   if (phase !== 'rolled' || selectedPoint !== null) return;
+  if (!isMyTurn()) return;
   const pulse = 0.55 + 0.45 * Math.sin(time * 0.14);
   const glow = `rgba(0,255,100,${(0.7 + 0.3 * pulse).toFixed(2)})`;
 
@@ -2543,8 +2545,8 @@ if (!_isTouchDevice && _rollBtn) _rollBtn.style.display = 'none';
 
 function updateRollButton() {
   if (!_rollBtn || !_isTouchDevice) return;
-  const show = phase==='idle' || phase==='opening' || phase==='opening_b'
-             || phase==='title' || phase==='gameover';
+  const show = (phase==='idle' || phase==='opening' || phase==='opening_b'
+             || phase==='title' || phase==='gameover') && isMyTurn();
   _rollBtn.style.display = show ? 'block' : 'none';
   if (phase==='idle')                          _rollBtn.textContent = '🎲  ROLL DICE';
   else if (phase==='opening')                  _rollBtn.textContent = '🎲  ROLL YOUR DIE';
