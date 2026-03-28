@@ -176,7 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.1-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.2-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -310,7 +310,7 @@ let roomCode = null;
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v3.1-MP';
+const VERSION    = 'v3.2-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -372,7 +372,8 @@ function _listenForState() {
       selectedPoint=null; highlights=[]; combinedHighlights=[]; checkerAnim=null; skipTimer=0;
 
       // ── Dice display ──────────────────────────────────────────────
-      if (phase === 'rolling' && data.diceInitState) {
+      const isRollingPhase = phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling';
+      if (isRollingPhase && data.diceInitState) {
         // Mirror the rolling animation — reconstruct physics from sender's initial state
         const leftMinX = IX + DIE_SZ/2 + 2, leftMaxX = BAR_X - DIE_SZ/2 - 2;
         const rightMinX = BAR_X + BAR_W + DIE_SZ/2 + 2, rightMaxX = BEAR_X - DIE_SZ/2 - 2;
@@ -385,7 +386,7 @@ function _listenForState() {
           return {
             x: d.x, y: d.y, vx: d.vx, vy: d.vy,
             rotation: d.rotation, angularVel: d.angularVel,
-            value: d.value, stopped: false, bounceCount: 0, frames: 0,
+            value: d.value, stopped: d.stopped || false, bounceCount: d.stopped ? 99 : 0, frames: 0,
             half: d.half,
             minX: isLeft ? leftMinX : rightMinX,
             maxX: isLeft ? leftMaxX : rightMaxX,
@@ -399,7 +400,7 @@ function _listenForState() {
         _showStaticDice(dice, positions);
       } else if (phase === 'opening_b' && openingDice[0]) {
         _showStaticDice([openingDice[0]]);
-      } else if (phase !== 'rolling' && phase !== 'opening_w_rolling' && phase !== 'opening_b_rolling') {
+      } else if (!isRollingPhase) {
         dicePhysics = [];
       }
 
@@ -468,8 +469,8 @@ function pushState(soundEvent = null) {
     winner: _gameWinner,
     winType: _gameWinType,
     // Dice rolling init state — lets remote mirror the same animation
-    diceInitState: phase === 'rolling'
-      ? dicePhysics.map(d => ({x:d.x,y:d.y,vx:d.vx,vy:d.vy,rotation:d.rotation,angularVel:d.angularVel,value:d.value,half:d.half||1}))
+    diceInitState: (phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling')
+      ? dicePhysics.map(d => ({x:d.x,y:d.y,vx:d.vx,vy:d.vy,rotation:d.rotation,angularVel:d.angularVel,value:d.value,half:d.half||1,stopped:d.stopped||false}))
       : null,
     // Dice final positions — remote snaps dice to same spots after roll settles
     dicePositions: phase === 'rolled'
@@ -626,10 +627,13 @@ document.addEventListener('touchstart', () => {
 const DICE_FILES = ['Dice rolling 1.m4a','Dice rolling 2.m4a','Dice rolling 3.m4a','Dice rolling 4.m4a','Dice rolling 5.m4a'];
 // Two pooled instances per file so overlapping rolls never cut each other off
 let diceAudioPool = null;
+let _safeCloseAudio = null;
 function loadDiceAudioBuffers() { // called on Start — pre-create pool so first roll has no delay
   if (diceAudioPool) return;
   diceAudioPool = DICE_FILES.flatMap(f => [new Audio(f), new Audio(f)]);
   diceAudioPool.forEach(a => { a.volume = 1.0; a.load(); });
+  _safeCloseAudio = new Audio('safe closed.m4a');
+  _safeCloseAudio.load();
 }
 
 function playDiceRollFile() {
@@ -719,7 +723,10 @@ function playBlotHit() {
   } catch(e) {}
 }
 function playSafeDoorClose() {
-  try { new Audio('safe closed.m4a').play(); } catch(e) {}
+  try {
+    if (_safeCloseAudio) { _safeCloseAudio.currentTime = 0; _safeCloseAudio.play(); }
+    else { new Audio('safe closed.m4a').play(); }
+  } catch(e) {}
 }
 function playClockTick() {
   try {
@@ -1121,6 +1128,7 @@ function rollOpeningWhite() {
   phase = 'opening_w_rolling';
   initDicePhysics(d, 0, true); // single die for white, top zone
   playDiceRollFile();
+  pushState('roll');
 }
 
 function rollOpeningBlack() {
@@ -1131,6 +1139,7 @@ function rollOpeningBlack() {
   phase = 'opening_b_rolling';
   addDieToPhysics(d); // add second die, white's stays stopped
   playDiceRollFile();
+  pushState('roll');
 }
 
 function initBoard() {
