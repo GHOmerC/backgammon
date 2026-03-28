@@ -72,50 +72,50 @@
       padding: 16px;
     }
     #setup-box {
-      background: #0a0412; border: 2px solid #b040c0;
+      background: #0e0a04; border: 2px solid #c9983a;
       border-radius: 14px; padding: 32px 44px;
       width: min(440px, 100%); /* shrinks to fit narrow phones */
-      color: #f0c0ec;
+      color: #f0ddb0;
     }
     #setup-box h2 {
-      text-align: center; color: #e060e8; font-size: 28px;
+      text-align: center; color: #e8c060; font-size: 28px;
       letter-spacing: 6px; margin-bottom: 6px;
     }
     #setup-box p {
-      text-align: center; font-size: 13px; color: #b070c0;
+      text-align: center; font-size: 13px; color: #b8a070;
       letter-spacing: 3px; margin-bottom: 24px;
     }
     .setup-row {
-      margin-bottom: 18px; border: 1px solid rgba(180,60,200,0.5);
+      margin-bottom: 18px; border: 1px solid rgba(201,152,58,0.5);
       border-radius: 8px; padding: 13px 16px;
     }
     .setup-row label {
       display: block; font-size: 12px; letter-spacing: 2px;
       margin-bottom: 10px; text-transform: uppercase; font-weight: bold;
     }
-    .wlabel { color: #e8a0e8; }
-    .blabel { color: #c0a0f0; }
+    .wlabel { color: #e0cc90; }
+    .blabel { color: #a8a8e0; }
     .setup-row input[type=text], .setup-row select {
       width: 100%; padding: 8px 12px; margin-bottom: 8px;
       background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(180,60,200,0.5); border-radius: 5px;
-      color: #f0c0f0; font-family: 'Courier New', monospace;
+      border: 1px solid rgba(201,152,58,0.5); border-radius: 5px;
+      color: #f8ecc0; font-family: 'Courier New', monospace;
       font-size: 16px; /* 16px minimum prevents iOS from auto-zooming on focus */
       outline: none; box-sizing: border-box;
     }
-    .setup-row select option { background: #140820; }
-    .setup-row input:focus, .setup-row select:focus { border-color: #d060e0; box-shadow: 0 0 4px rgba(200,80,220,0.3); }
+    .setup-row select option { background: #1a1208; }
+    .setup-row input:focus, .setup-row select:focus { border-color: #e0b84a; box-shadow: 0 0 4px rgba(224,184,74,0.3); }
     #start-btn {
       display: block; width: 100%; padding: 16px; margin-top: 8px;
-      background: linear-gradient(135deg, #6a1080, #c040d0);
-      border: none; border-radius: 8px; color: #fff0ff;
+      background: linear-gradient(135deg, #7a4a10, #c9983a);
+      border: none; border-radius: 8px; color: #fff8e7;
       font-family: 'Courier New', monospace; font-size: 16px;
       font-weight: bold; letter-spacing: 4px; cursor: pointer;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       min-height: 52px; /* comfortable tap target on mobile */
     }
-    #start-btn:hover { background: linear-gradient(135deg, #8a1aa0, #d858e8); }
-    #start-btn:active { background: linear-gradient(135deg, #8a1aa0, #d858e8); transform: scale(0.98); }
+    #start-btn:hover { background: linear-gradient(135deg, #9a5e18, #dba84a); }
+    #start-btn:active { background: linear-gradient(135deg, #9a5e18, #dba84a); transform: scale(0.98); }
     /* ── On-screen Roll button (shown only on touch devices) ── */
     #roll-btn {
       display: none; /* shown/hidden by updateRollButton() */
@@ -124,8 +124,8 @@
       left: 50%;
       transform: translateX(-50%);
       padding: 18px 48px;
-      background: linear-gradient(135deg, #6a1080, #c040d0);
-      border: 2px solid #e060f0;
+      background: linear-gradient(135deg, #7a4a10, #c9983a);
+      border: 2px solid #e8c060;
       border-radius: 14px;
       color: #fff8e7;
       font-family: 'Courier New', monospace;
@@ -140,31 +140,31 @@
       white-space: nowrap;
     }
     #roll-btn:active {
-      background: linear-gradient(135deg, #8a1aa0, #d858e8);
+      background: linear-gradient(135deg, #9a5e18, #dba84a);
       transform: translateX(-50%) scale(0.96);
     }
     /* ── Multiplayer lobby styles ── */
     #create-btn, #join-btn {
       display: block; width: 100%; padding: 13px; margin-bottom: 8px;
-      background: linear-gradient(135deg, #6a1080, #c040d0);
-      border: none; border-radius: 8px; color: #fff0ff;
+      background: linear-gradient(135deg, #7a4a10, #c9983a);
+      border: none; border-radius: 8px; color: #fff8e7;
       font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold;
       letter-spacing: 2px; cursor: pointer; touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-    #create-btn:hover, #join-btn:hover { background: linear-gradient(135deg, #8a1aa0, #d858e8); }
+    #create-btn:hover, #join-btn:hover { background: linear-gradient(135deg, #9a5e18, #dba84a); }
     #join-code {
       display: block; width: 100%; box-sizing: border-box;
-      background: #140820; border: 1px solid #7a30a0; border-radius: 6px;
-      color: #e060e8; font-family: 'Courier New', monospace; font-size: 24px;
+      background: #1a1208; border: 1px solid #6a4a20; border-radius: 6px;
+      color: #e8c060; font-family: 'Courier New', monospace; font-size: 24px;
       font-weight: bold; text-align: center; letter-spacing: 8px;
       padding: 10px; margin-bottom: 8px; text-transform: uppercase;
     }
-    #join-code:focus { border-color: #d060e0; outline: none; }
-    #lobby-sep { text-align: center; color: #7a30a0; margin: 10px 0; font-size: 13px; letter-spacing: 3px; }
+    #join-code:focus { border-color: #e0b84a; outline: none; }
+    #lobby-sep { text-align: center; color: #6a4a20; margin: 10px 0; font-size: 13px; letter-spacing: 3px; }
     #waiting-room { display: none; text-align: center; padding-top: 6px; }
-    #waiting-room .wlabel { font-size: 12px; color: #c080d0; letter-spacing: 2px; }
-    #room-code-display { font-size: 42px; font-weight: bold; letter-spacing: 12px; color: #e060e8; margin: 10px 0 6px; }
+    #waiting-room .wlabel { font-size: 12px; color: #b8a070; letter-spacing: 2px; }
+    #room-code-display { font-size: 42px; font-weight: bold; letter-spacing: 12px; color: #e8c060; margin: 10px 0 6px; }
     #waiting-status { font-size: 12px; color: #888; letter-spacing: 1px; }
     #mp-error { color: #ff7070; font-size: 12px; text-align: center; margin-top: 8px; min-height: 16px; }
   </style>
@@ -176,7 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#9040b0; margin-bottom:4px; margin-top:-4px;">v3.2-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.2-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -245,15 +245,15 @@ const F2_SCALE      = 0.80; // kept for compatibility
 
 // ── Colour palette ───────────────────────────────────────────
 const C = {
-  wood:      '#5a1a72', woodDark:  '#2a0840', woodLight: '#8a3aaa',
-  felt:      '#3a0a52', feltShade: '#2a0640',
-  ptGold:    '#d44aaa', ptRed:     '#6e14a0',
-  ptGoldHi:  '#f070cc', ptRedHi:   '#9b3fc4',
-  bar:       '#220840', barLine:   '#6a2088',
-  bearBg:    '#300848', bearLine:  '#7a2a90',
-  label:     '#f0c0ec', labelDim:  '#b07aaa',
+  wood:      '#6b3a1f', woodDark:  '#3d1f08', woodLight: '#8b5a2b',
+  felt:      '#1c4d2e', feltShade: '#164024',
+  ptGold:    '#c9983a', ptRed:     '#8b1c2a',
+  ptGoldHi:  '#e0b84a', ptRedHi:   '#a52535',
+  bar:       '#4a2208', barLine:   '#6b3a1f',
+  bearBg:    '#3a2010', bearLine:  '#6b3a1f',
+  label:     '#f0ddb0', labelDim:  '#9a8860',
   divider:   'rgba(0,0,0,0.4)',
-  medallion: 'rgba(255,100,220,0.07)',
+  medallion: 'rgba(255,220,100,0.07)',
   wBase:  '#f0ddb0', wEdge:  '#b89a60', wInner: '#fffaee',
   bBase:  '#1e2030', bEdge:  '#0a0c14', bInner: '#3a3d55',
 };
@@ -1689,7 +1689,7 @@ function drawOpponentWaiting() {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   roundRect(cx - 140, cy - 18, 280, 36, 8); ctx.fill();
-  ctx.fillStyle = '#f0c0f8'; ctx.font = 'bold 14px Courier New';
+  ctx.fillStyle = '#e8d080'; ctx.font = 'bold 14px Courier New';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('Waiting for ' + oppName + '...', cx, cy);
   ctx.restore();
@@ -1705,7 +1705,7 @@ function drawDiceArea() {
     ctx.fillStyle='rgba(200,175,80,0.25)';
     roundRect(bX,bY,bW,bH,bR); ctx.fill();
     ctx.strokeStyle=C.ptGoldHi; ctx.lineWidth=1.5; roundRect(bX,bY,bW,bH,bR); ctx.stroke();
-    ctx.fillStyle='#f0c0f8'; ctx.font='bold 13px Courier New'; ctx.textAlign='center';
+    ctx.fillStyle='#f8e8a0'; ctx.font='bold 13px Courier New'; ctx.textAlign='center';
     ctx.fillText('Opening Roll', bX+bW/2, bY+18);
 
     const _wn = players.white.name || 'White';
@@ -1715,7 +1715,7 @@ function drawDiceArea() {
     if (phase === 'opening') {
       // Show white's name only to white (or singleplayer)
       if (!myRole || myRole === 'white') {
-        ctx.fillStyle='#f0c0f8'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
         ctx.fillText(_wn, _cx, gapCy - 6);
       }
       if (isMyTurn() && Math.floor(time/30)%2===0) {
@@ -1724,7 +1724,7 @@ function drawDiceArea() {
       }
     } else if (phase === 'opening_w_rolling') {
       if (!myRole || myRole === 'white') {
-        ctx.fillStyle='#f0c0f8'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
+        ctx.fillStyle='#f0dda0'; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
         ctx.fillText(_wn, _cx, gapCy - 6);
       }
       ctx.fillStyle=C.labelDim; ctx.font='11px Courier New'; ctx.textAlign='center';
@@ -1754,7 +1754,7 @@ function drawDiceArea() {
   ctx.fillStyle=isW?'rgba(240,220,160,0.22)':'rgba(30,32,48,0.65)';
   roundRect(bX,bY,bW,bH,bR); ctx.fill();
   ctx.strokeStyle=isW?C.wEdge:C.bInner; ctx.lineWidth=1.5; roundRect(bX,bY,bW,bH,bR); ctx.stroke();
-  ctx.fillStyle=isW?'#f0c0f8':'#d0a0f8'; ctx.font='bold 14px Courier New'; ctx.textAlign='center';
+  ctx.fillStyle=isW?'#f8e8a0':'#d0d0ff'; ctx.font='bold 14px Courier New'; ctx.textAlign='center';
   const _pn = isW ? players.white : players.black;
   const _colorWord = isW ? 'white' : 'black';
   ctx.fillText(_pn.name.substring(0,12) + ' plays ' + _colorWord, bX+bW/2, bY+18);
@@ -2070,7 +2070,7 @@ function drawTitleScreen() {
     ctx.fillText(players.white.name.substring(0,9)+'  '+gameScore.white, CW/2-8, CH*.38+14);
     ctx.fillStyle='rgba(201,152,58,0.6)'; ctx.textAlign='center';
     ctx.fillText('–', CW/2, CH*.38+14);
-    ctx.fillStyle='#f0c0f8'; ctx.textAlign='left';
+    ctx.fillStyle='#e8e8ff'; ctx.textAlign='left';
     ctx.fillText('  '+gameScore.black+'  '+players.black.name.substring(0,9), CW/2+8, CH*.38+14);
   } else {
     ctx.fillStyle=C.labelDim; ctx.font='13px Courier New'; ctx.textAlign='center';
@@ -2092,7 +2092,7 @@ function drawTitleScreen() {
   ctx.strokeStyle=C.bInner; ctx.lineWidth=1;
   roundRect(CW/2+25,py-22,185,38,6); ctx.stroke();
   drawChecker(CW/2+43,py-3,'black',.65);
-  ctx.fillStyle='#f0c0f8'; ctx.font='13px Courier New'; ctx.textAlign='left';
+  ctx.fillStyle='#e8e8ff'; ctx.font='13px Courier New'; ctx.textAlign='left';
   ctx.fillText(players.black.name.substring(0,14), CW/2+67, py+4);
   if (players.black.flag) drawCanvasFlag(players.black.flag, CW/2+198, py-16, 30, 20);
 
@@ -2445,7 +2445,7 @@ function drawBearOff() {
     gr.addColorStop(0,C.bInner); gr.addColorStop(1,C.bEdge);
     ctx.fillStyle=gr; ctx.fill(); ctx.strokeStyle=C.bInner; ctx.lineWidth=1; ctx.stroke();
   }
-  if(off.black>0){ctx.fillStyle='#f0c0f8';ctx.font='bold 10px Courier New';ctx.fillText(off.black,tx,IY+IH/2-4);}
+  if(off.black>0){ctx.fillStyle='#e8e8ff';ctx.font='bold 10px Courier New';ctx.fillText(off.black,tx,IY+IH/2-4);}
 
   drawDollarBill();
 }
@@ -2533,7 +2533,7 @@ function drawBoard() {
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(IX,IY,PLAY_W,IH);
     const gcx=IX+PLAY_W/2, gcy=IY+IH/2;
     // Box slightly wider (420px) to fit: [flag] [name] [safe] [score]
-    ctx.fillStyle='rgba(15,5,20,0.92)'; roundRect(gcx-210,gcy-65,420,155,12); ctx.fill();
+    ctx.fillStyle='rgba(20,15,5,0.92)'; roundRect(gcx-210,gcy-65,420,155,12); ctx.fill();
     ctx.strokeStyle=C.ptGoldHi; ctx.lineWidth=2; roundRect(gcx-210,gcy-65,420,155,12); ctx.stroke();
     ctx.fillStyle=C.ptGoldHi; ctx.font='bold 28px Courier New'; ctx.textAlign='center';
     ctx.fillText(statusMsg,gcx,gcy-22);
