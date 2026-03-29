@@ -1,5 +1,5 @@
 // Service Worker — caches assets for offline play
-const CACHE = 'backgammon-v4';
+const CACHE = 'backgammon-v5';
 const ASSETS = [
   'manifest.json',
   'icon.svg',
