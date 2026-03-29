@@ -1,5 +1,12 @@
 # Backgammon Changelog
 
+## v4.1-MP
+**Fix matchmaking — atomic claim via Firebase transaction**
+- Root cause of v4.0 failure: both players rescanned at the same time, both found each other, both tried to become White simultaneously → deadlock
+- Fix: use a Firebase transaction to atomically mark a queue entry as claimed; only one player wins the transaction, the other gets `null` and backs off
+- Both players now add themselves to the queue immediately on click, then scan every 3s
+- Black side ignores `roomCode = 'PENDING'` and waits for the real room code
+
 ## v4.0-MP
 **Fix matchmaking race condition**
 - Both players clicking "Find a Match" at the same time would both see an empty queue, both add themselves, and neither would ever find the other

@@ -353,7 +353,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.0-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.1-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -668,7 +668,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.0-MP';
+const VERSION    = 'v4.1-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -729,146 +729,105 @@ function _cancelMatchSearch() {
   _showLobby();
 }
 
-async function _findMatch(name, flag) {
-  await _registerPlayer(name);
-  const myEntry = { name, flag, rating: _myRating, ts: Date.now(), roomCode: null };
-  // Scan queue for best match
-  const snap = await _fbDb.ref('matchQueue').once('value');
-  const now = Date.now();
-  let bestKey = null, bestDiff = Infinity, bestTs = Infinity;
-  snap.forEach(child => {
-    const d = child.val();
-    if (!d || d.roomCode !== null) return; // already claimed
-    if (now - d.ts > 30000) return;        // stale (>30s)
-    const diff = Math.abs((d.rating || 1500) - _myRating);
-    if (diff < bestDiff || (diff === bestDiff && d.ts < bestTs)) {
-      bestDiff = diff; bestTs = d.ts; bestKey = child.key;
-    }
+// Atomically claim a queue entry using a Firebase transaction.
+// Returns the entry data if claimed, null if someone else got it first.
+async function _claimQueueEntry(key) {
+  let claimed = null;
+  await _fbDb.ref('matchQueue/' + key).transaction(current => {
+    if (!current || current.roomCode !== null) return undefined; // abort — already claimed
+    claimed = { ...current };
+    return { ...current, roomCode: 'PENDING' }; // mark as taken
   });
-
-  if (bestKey) {
-    // Claim that entry — we are White, they are Black
-    const theirSnap = await _fbDb.ref('matchQueue/' + bestKey).once('value');
-    const them = theirSnap.val();
-    if (!them || them.roomCode !== null || now - them.ts > 30000) {
-      // Race condition: entry gone or stale — just add ourselves to queue instead
-      _addSelfToQueue(name, flag, myEntry);
-      return;
-    }
-    roomCode   = _genCode();
-    _sessionId = Math.random().toString(36).slice(2, 10);
-    _fbRoom    = _fbDb.ref('rooms/' + roomCode);
-    myRole     = 'white';
-    players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-    players.black = { name: them.name, flag: them.flag||'', rating: them.rating||1500, level: _levelLabel(them.rating||1500) };
-    await _fbRoom.remove();
-    await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-    // Write roomCode into their queue entry to wake them up
-    await _fbDb.ref('matchQueue/' + bestKey).update({ roomCode });
-    // Remove their entry after a short delay
-    setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 5000);
-    document.getElementById('lobby-section').style.display = 'none';
-    document.getElementById('searching-room').style.display = 'none';
-    document.getElementById('room-code-display').textContent = roomCode;
-    document.getElementById('waiting-room').style.display = 'block';
-    document.getElementById('waiting-status').textContent = 'Match found! Connecting...';
-    // Wait for Black to write their player record (same as Create flow)
-    let _joined = false;
-    _fbRoom.child('players/black').on('value', snap2 => {
-      const bl = snap2.val();
-      if (!bl || !bl.name || bl.name === '...' || _joined) return;
-      _joined = true;
-      _fbRoom.child('players/black').off('value');
-      players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
-      _launchGame(); _listenForState(); pushState();
-    });
-  } else {
-    _addSelfToQueue(name, flag, myEntry);
-  }
+  return claimed; // null if aborted
 }
 
-function _addSelfToQueue(name, flag, myEntry) {
+async function _becomeWhite(name, flag, theirKey, them) {
+  if (!_matchQueueRef) return; // we were cancelled
+  _matchQueueRef.off('value');
+  _matchQueueRef.remove();
+  _matchQueueRef = null;
+  roomCode   = _genCode();
+  _sessionId = Math.random().toString(36).slice(2, 10);
+  _fbRoom    = _fbDb.ref('rooms/' + roomCode);
+  myRole     = 'white';
+  players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
+  players.black = { name: them.name, flag: them.flag||'', rating: them.rating||1500, level: _levelLabel(them.rating||1500) };
+  await _fbRoom.remove();
+  await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
+  // Write the real roomCode into their entry to wake them up
+  await _fbDb.ref('matchQueue/' + theirKey).update({ roomCode });
+  setTimeout(() => _fbDb.ref('matchQueue/' + theirKey).remove(), 5000);
+  document.getElementById('searching-room').style.display = 'none';
+  document.getElementById('room-code-display').textContent = roomCode;
+  document.getElementById('waiting-room').style.display = 'block';
+  document.getElementById('waiting-status').textContent = 'Match found! Connecting...';
+  let _joined = false;
+  _fbRoom.child('players/black').on('value', snap2 => {
+    const bl = snap2.val();
+    if (!bl || !bl.name || bl.name === '...' || _joined) return;
+    _joined = true;
+    _fbRoom.child('players/black').off('value');
+    players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
+    _launchGame(); _listenForState(); pushState();
+  });
+}
+
+async function _findMatch(name, flag) {
+  await _registerPlayer(name);
+  // Add ourselves to queue first, then try to find someone
   _matchQueueRef = _fbDb.ref('matchQueue').push();
-  _matchQueueRef.set(myEntry);
+  await _matchQueueRef.set({ name, flag, rating: _myRating, ts: Date.now(), roomCode: null });
   document.getElementById('searching-status').textContent = '🔍  Searching for opponent...';
 
-  // Listen for roomCode written into our entry (we were claimed as Black)
+  // Listen for roomCode written into our entry (someone else claimed us as Black)
   _matchQueueRef.on('value', snap => {
     const d = snap.val();
-    if (!d || d.roomCode === null || d.roomCode === undefined) return;
-    _claimedAsBlack(d.roomCode, name, flag);
+    if (!d) return;
+    const rc = d.roomCode;
+    if (!rc || rc === null || rc === 'PENDING') return;
+    // We've been claimed — join as Black
+    _matchQueueRef.off('value');
+    _matchQueueRef.remove();
+    _matchQueueRef = null;
+    roomCode = rc;
+    myRole   = 'black';
+    _fbRoom  = _fbDb.ref('rooms/' + roomCode);
+    _fbRoom.child('players/white').once('value', snap2 => {
+      const wh = snap2.val();
+      players.white = { name: wh ? wh.name : '?', flag: wh ? wh.flag||'' : '', rating: wh ? wh.rating||1500 : 1500, level: _levelLabel(wh ? wh.rating||1500 : 1500) };
+      players.black = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
+      _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
+      document.getElementById('searching-room').style.display = 'none';
+      _listenForState();
+    });
   });
 
-  // Also re-scan every 4s in case someone joined AFTER we added ourselves (race condition)
+  // Scan for existing players every 3s; use transaction to claim atomically
   const _rescanInterval = setInterval(async () => {
-    if (!_matchQueueRef) { clearInterval(_rescanInterval); return; } // cancelled
+    if (!_matchQueueRef) { clearInterval(_rescanInterval); return; }
+    const myKey = _matchQueueRef ? _matchQueueRef.key : null;
+    if (!myKey) { clearInterval(_rescanInterval); return; }
     const now = Date.now();
     const snap = await _fbDb.ref('matchQueue').once('value');
-    const myKey = _matchQueueRef.key;
     let bestKey = null, bestDiff = Infinity, bestTs = Infinity;
     snap.forEach(child => {
-      if (child.key === myKey) return; // skip our own entry
+      if (child.key === myKey) return;
       const d = child.val();
-      if (!d || d.roomCode !== null) return;
-      if (now - d.ts > 30000) return;
+      if (!d || d.roomCode !== null) return; // skip claimed entries
+      if (now - d.ts > 30000) return;        // skip stale
       const diff = Math.abs((d.rating || 1500) - _myRating);
       if (diff < bestDiff || (diff === bestDiff && d.ts < bestTs)) {
         bestDiff = diff; bestTs = d.ts; bestKey = child.key;
       }
     });
     if (!bestKey) return;
-    // Found someone — claim them, become White
     clearInterval(_rescanInterval);
-    if (!_matchQueueRef) return; // cancelled between scan and claim
-    const theirSnap = await _fbDb.ref('matchQueue/' + bestKey).once('value');
-    const them = theirSnap.val();
-    if (!them || them.roomCode !== null || Date.now() - them.ts > 30000) return;
-    // Stop listening for someone to claim us
-    _matchQueueRef.off('value');
-    _matchQueueRef.remove();
-    _matchQueueRef = null;
-    roomCode   = _genCode();
-    _sessionId = Math.random().toString(36).slice(2, 10);
-    _fbRoom    = _fbDb.ref('rooms/' + roomCode);
-    myRole     = 'white';
-    players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-    players.black = { name: them.name, flag: them.flag||'', rating: them.rating||1500, level: _levelLabel(them.rating||1500) };
-    await _fbRoom.remove();
-    await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-    await _fbDb.ref('matchQueue/' + bestKey).update({ roomCode });
-    setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 5000);
-    document.getElementById('searching-room').style.display = 'none';
-    document.getElementById('room-code-display').textContent = roomCode;
-    document.getElementById('waiting-room').style.display = 'block';
-    document.getElementById('waiting-status').textContent = 'Match found! Connecting...';
-    let _joined = false;
-    _fbRoom.child('players/black').on('value', snap2 => {
-      const bl = snap2.val();
-      if (!bl || !bl.name || bl.name === '...' || _joined) return;
-      _joined = true;
-      _fbRoom.child('players/black').off('value');
-      players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
-      _launchGame(); _listenForState(); pushState();
-    });
-  }, 4000);
-}
-
-function _claimedAsBlack(rc, name, flag) {
-  if (!_matchQueueRef) return;
-  _matchQueueRef.off('value');
-  _matchQueueRef.remove();
-  _matchQueueRef = null;
-  roomCode = rc;
-  myRole   = 'black';
-  _fbRoom  = _fbDb.ref('rooms/' + roomCode);
-  _fbRoom.child('players/white').once('value', snap2 => {
-    const wh = snap2.val();
-    players.white = { name: wh ? wh.name : '?', flag: wh ? wh.flag||'' : '', rating: wh ? wh.rating||1500 : 1500, level: _levelLabel(wh ? wh.rating||1500 : 1500) };
-    players.black = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-    _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-    document.getElementById('searching-room').style.display = 'none';
-    _listenForState();
-  });
+    if (!_matchQueueRef) return;
+    // Atomically claim their entry
+    const them = await _claimQueueEntry(bestKey);
+    if (!them) return; // lost the race — another player claimed it first
+    await _becomeWhite(name, flag, bestKey, them);
+  }, 3000);
 }
 
 async function _registerPlayer(name) {
