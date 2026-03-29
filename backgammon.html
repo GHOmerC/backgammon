@@ -176,7 +176,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.4-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.5-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -314,7 +314,7 @@ let roomCode = null;
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v3.4-MP';
+const VERSION    = 'v3.5-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -398,8 +398,10 @@ function _listenForState() {
       const isRollingPhase = phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling';
       if (isRollingPhase && data.diceInitState) {
         // Mirror the rolling animation — reconstruct physics from sender's initial state
-        const leftMinX = IX + DIE_SZ/2 + 2, leftMaxX = BAR_X - DIE_SZ/2 - 2;
-        const rightMinX = BAR_X + BAR_W + DIE_SZ/2 + 2, rightMaxX = BEAR_X - DIE_SZ/2 - 2;
+        const leftMinX  = (_leftBase ? bearX()+BEAR_W : IX) + DIE_SZ/2 + 2;
+        const leftMaxX  = barX() - DIE_SZ/2 - 2;
+        const rightMinX = barX() + BAR_W + DIE_SZ/2 + 2;
+        const rightMaxX = (_leftBase ? IX+IW : bearX()) - DIE_SZ/2 - 2;
         const minY = IY + DIE_SZ/2 + 2, maxY = IY + IH - DIE_SZ/2 - 2;
         const initArr = Array.isArray(data.diceInitState)
           ? data.diceInitState
@@ -471,8 +473,8 @@ function _listenForState() {
 
 function _showStaticDice(vals, positions) {
   // Use right-half boundaries — same as initDicePhysics right side
-  const minX = BAR_X + BAR_W + DIE_SZ/2 + 2;
-  const maxX = BEAR_X - DIE_SZ/2 - 2;
+  const minX = barX() + BAR_W + DIE_SZ/2 + 2;
+  const maxX = (_leftBase ? IX + IW : bearX()) - DIE_SZ/2 - 2;
   const minY = IY + DIE_SZ/2 + 2;
   const maxY = IY + IH - DIE_SZ/2 - 2;
   const cx = (minX + maxX) / 2;
@@ -876,10 +878,11 @@ function initDicePhysics(d1val, d2val, onlyFirst = false) {
   dicePhysics = [];
 
   // Pick the side (left or right) with fewer total checkers — both dice land there
-  const leftMinX = IX + DIE_SZ/2 + 2;
-  const leftMaxX = BAR_X - DIE_SZ/2 - 2;
-  const rightMinX = BAR_X + BAR_W + DIE_SZ/2 + 2;
-  const rightMaxX = BEAR_X - DIE_SZ/2 - 2;
+  const _bx = barX(), _bex = bearX();
+  const leftMinX  = (_leftBase ? _bex + BEAR_W : IX) + DIE_SZ/2 + 2;
+  const leftMaxX  = _bx - DIE_SZ/2 - 2;
+  const rightMinX = _bx + BAR_W + DIE_SZ/2 + 2;
+  const rightMaxX = (_leftBase ? IX + IW : _bex) - DIE_SZ/2 - 2;
   const minY = IY + DIE_SZ/2 + 2;
   const maxY = IY + IH - DIE_SZ/2 - 2;
 
@@ -1754,7 +1757,8 @@ function drawOpponentWaiting() {
 // ── Dice area (banner + press R + moves left counter) ─────────
 function drawDiceArea() {
   const gapTop=TOP_BASE+PT_H+4, gapBot=BOT_BASE-PT_H-4, gapCy=(gapTop+gapBot)/2;
-  const bW=210, bH=26, bR=5, bX=IX+HALF_W/2-105, bY=gapCy-54;
+  const _midCx = barX() + BAR_W + HALF_W/2; // center of right playing half (home side)
+  const bW=210, bH=26, bR=5, bX=_midCx-105, bY=gapCy-54;
 
   if (phase === 'opening' || phase === 'opening_w_rolling' || phase === 'opening_b' || phase === 'opening_b_rolling') {
     // Opening roll banner
@@ -1766,7 +1770,7 @@ function drawDiceArea() {
 
     const _wn = players.white.name || 'White';
     const _bn = players.black.name || 'Black';
-    const _cx = IX + HALF_W / 2;
+    const _cx = _midCx;
 
     if (phase === 'opening') {
       // Show white's name only to white (or singleplayer)
@@ -1817,10 +1821,10 @@ function drawDiceArea() {
 
   if (phase==='idle' && isMyTurn() && Math.floor(time/30)%2===0) {
     ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
-    ctx.fillText('Press  R  to roll your dice', IX+HALF_W/2, gapCy+6);
+    ctx.fillText('Press  R  to roll your dice', _midCx, gapCy+6);
   } else if (phase==='rolled' && movesLeft.length > 0) {
     ctx.fillStyle=C.labelDim; ctx.font='10px Courier New'; ctx.textAlign='center';
-    ctx.fillText(movesLeft.length+' move'+(movesLeft.length>1?'s':'')+' left', IX+HALF_W/2, gapBot-6);
+    ctx.fillText(movesLeft.length+' move'+(movesLeft.length>1?'s':'')+' left', _midCx, gapBot-6);
   }
   // Dice themselves are drawn in drawDicePhysics() called from drawBoard()
 }
@@ -1832,7 +1836,7 @@ function drawClock() {
   if (turnTimer<=0) return;
   // Only reveal after 30 seconds have elapsed (< 4:30 remaining)
   if (turnTimer > TURN_FRAMES - 1800) return;
-  const cx = IX + HALF_W + BAR_W + HALF_W/2;
+  const cx = barX() + BAR_W + HALF_W/2;
   const gapTop = TOP_BASE+PT_H+4, gapBot = BOT_BASE-PT_H-4;
   const cy = (gapTop+gapBot)/2, r = 22;
   const ratio = turnTimer / TURN_FRAMES;
@@ -2510,7 +2514,7 @@ function drawBearOff() {
 
 function drawMedallion() {
   const cy=IY+IH/2, r=46;
-  for(const cx of [IX+HALF_W/2, IX+HALF_W+BAR_W+HALF_W/2]){
+  for(const cx of [(_leftBase?IX+BEAR_W:IX)+HALF_W/2, barX()+BAR_W+HALF_W/2]){
     ctx.save(); ctx.strokeStyle=C.medallion; ctx.lineWidth=2;
     ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx,cy,r*.55,0,Math.PI*2); ctx.stroke();
@@ -2541,11 +2545,12 @@ function drawPointLabels() {
 }
 
 function drawBoard() {
+  const feltX = _leftBase ? IX + BEAR_W : IX;
   drawWoodFrame();
-  ctx.fillStyle=C.felt; ctx.fillRect(IX,IY,PLAY_W,IH);
-  const fv=ctx.createRadialGradient(IX+PLAY_W/2,IY+IH/2,IH*.1,IX+PLAY_W/2,IY+IH/2,IH*.8);
+  ctx.fillStyle=C.felt; ctx.fillRect(feltX,IY,PLAY_W,IH);
+  const fv=ctx.createRadialGradient(feltX+PLAY_W/2,IY+IH/2,IH*.1,feltX+PLAY_W/2,IY+IH/2,IH*.8);
   fv.addColorStop(0,'rgba(255,255,255,0.04)'); fv.addColorStop(1,'rgba(0,0,0,0.25)');
-  ctx.fillStyle=fv; ctx.fillRect(IX,IY,PLAY_W,IH);
+  ctx.fillStyle=fv; ctx.fillRect(feltX,IY,PLAY_W,IH);
   drawMedallion(); drawPoints(); drawBar(); drawBearOff();
   drawQuadrantLabels(); drawPointLabels();
   drawAllHighlights(); drawAllCheckers(); drawMovableGlows(); drawSelectionRing();
@@ -2588,7 +2593,7 @@ function drawBoard() {
   }
 
   if(phase==='gameover'){
-    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(IX,IY,PLAY_W,IH);
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(feltX,IY,PLAY_W,IH);
     const gcx=IX+PLAY_W/2, gcy=IY+IH/2;
     // Box slightly wider (420px) to fit: [flag] [name] [safe] [score]
     ctx.fillStyle='rgba(20,15,5,0.92)'; roundRect(gcx-210,gcy-65,420,155,12); ctx.fill();
