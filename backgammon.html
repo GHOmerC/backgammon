@@ -335,7 +335,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.6-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.7-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -347,6 +347,7 @@
         <label for="left-base" style="font-size:11px;letter-spacing:1px;color:#b070c0;cursor:pointer;user-select:none;">HOME BOARD ON LEFT SIDE</label>
       </div>
     </div>
+    <div id="rating-display" style="text-align:center; font-size:12px; letter-spacing:2px; color:#a8c878; margin-bottom:12px; min-height:16px;"></div>
     <div id="lobby-section">
       <button id="create-btn">⬜  CREATE GAME  (play as White)</button>
       <div id="lobby-sep">— or —</div>
@@ -636,10 +637,14 @@ const FB_CONFIG = {
 let _fbDb = null, _fbRoom = null;
 let myRole = null;   // 'white' | 'black' — null until game starts
 let roomCode = null;
+let _myIp = '';
+let _myRating = 1500;
+let _myGamesPlayed = 0;
+let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v3.6-MP';
+const VERSION    = 'v3.7-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -650,6 +655,43 @@ function _fbInit() {
 function _genCode() {
   const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   return Array.from({length:4}, () => c[Math.floor(Math.random()*c.length)]).join('');
+}
+
+function _levelLabel(r) {
+  return r < 1200 ? 'Beginner' : r < 1400 ? 'Casual' : r < 1600 ? 'Club Player' :
+         r < 1800 ? 'Advanced' : r < 2000 ? 'Expert' : r < 2200 ? 'Master' : 'World-class';
+}
+
+function _mkPlayerKey(name, ip) {
+  const n = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'player';
+  return n + '_' + ip.replace(/\./g, '_');
+}
+
+function _updateRatingDisplay() {
+  const el = document.getElementById('rating-display');
+  if (el) el.textContent = _levelLabel(_myRating) + '  ·  ' + _myRating;
+}
+
+async function _registerPlayer(name) {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const json = await res.json();
+    _myIp = json.ip;
+  } catch(e) { _myIp = 'unknown_' + Date.now(); }
+  _fbInit();
+  _myPlayerKey = _mkPlayerKey(name, _myIp);
+  const ref = _fbDb.ref('players/' + _myPlayerKey);
+  const snap = await ref.once('value');
+  const rec = snap.val();
+  if (rec) {
+    _myRating = rec.rating || 1500;
+    _myGamesPlayed = rec.gamesPlayed || 0;
+    ref.update({ name, lastSeen: Date.now() });
+  } else {
+    _myRating = 1500; _myGamesPlayed = 0;
+    ref.set({ name, ip: _myIp, rating: 1500, gamesPlayed: 0, lastSeen: Date.now() });
+  }
+  _updateRatingDisplay();
 }
 
 let _loopStarted = false;
@@ -873,19 +915,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  document.getElementById('create-btn').addEventListener('click', () => {
+  document.getElementById('create-btn').addEventListener('click', async () => {
     const name = document.getElementById('my-name').value.trim() || 'White';
     const flag = document.getElementById('my-country').value;
     showErr('');
-    _fbInit();
+    await _registerPlayer(name);
     roomCode   = _genCode();
     _sessionId = Math.random().toString(36).slice(2, 10); // fresh session ID
     _fbRoom    = _fbDb.ref('rooms/' + roomCode);
     myRole     = 'white';
-    players.white = {name, flag};
-    players.black = {name:'...', flag:''};
+    players.white = {name, flag, rating: _myRating, level: _levelLabel(_myRating)};
+    players.black = {name:'...', flag:'', rating: 1500, level: 'Beginner'};
     // Wipe any stale data from a previous game on this code, then write player
-    _fbRoom.remove().then(() => _fbRoom.child('players/white').set({name, flag}));
+    _fbRoom.remove().then(() => _fbRoom.child('players/white').set({name, flag, rating: _myRating, level: _levelLabel(_myRating)}));
     // Show waiting room
     document.getElementById('lobby-section').style.display = 'none';
     document.getElementById('room-code-display').textContent = roomCode;
@@ -897,29 +939,29 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!bl || !bl.name || bl.name === '...' || _joined) return;
       _joined = true;
       _fbRoom.child('players/black').off('value');
-      players.black = {name: bl.name, flag: bl.flag||''};
+      players.black = {name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: bl.level||_levelLabel(bl.rating||1500)};
       _launchGame();
       _listenForState();
       pushState(); // White pushes initial board state to start the game
     });
   });
 
-  document.getElementById('join-btn').addEventListener('click', () => {
+  document.getElementById('join-btn').addEventListener('click', async () => {
     const name = document.getElementById('my-name').value.trim() || 'Black';
     const flag = document.getElementById('my-country').value;
     const code = (document.getElementById('join-code').value||'').trim().toUpperCase();
     if (code.length !== 4) { showErr('Please enter a 4-letter room code.'); return; }
     showErr('Joining...');
-    _fbInit();
+    await _registerPlayer(name);
     roomCode = code;
     _fbRoom  = _fbDb.ref('rooms/' + roomCode);
     _fbRoom.child('players/white').once('value', snap => {
       const wh = snap.val();
       if (!wh || !wh.name) { showErr('Room not found. Check the code and try again.'); return; }
       myRole = 'black';
-      players.white = {name: wh.name, flag: wh.flag||''};
-      players.black = {name, flag};
-      _fbRoom.child('players/black').set({name, flag});
+      players.white = {name: wh.name, flag: wh.flag||'', rating: wh.rating||1500, level: wh.level||_levelLabel(wh.rating||1500)};
+      players.black = {name, flag, rating: _myRating, level: _levelLabel(_myRating)};
+      _fbRoom.child('players/black').set({name, flag, rating: _myRating, level: _levelLabel(_myRating)});
       _listenForState(); // listen BEFORE launch so we get the initial state push from White
     });
   });
@@ -2949,13 +2991,20 @@ function drawBoard() {
 
   ctx.fillStyle=C.labelDim; ctx.font='bold 12px Courier New'; ctx.textAlign='left';
   ctx.fillText('BACKGAMMON',BX+8,BY+14);
-  // Version label: middle of left border, rotated 90°
+  // Version + level·rating: middle of left border, rotated 90°
   ctx.save();
   ctx.translate(BX + BORDER/2, BY + BH/2);
   ctx.rotate(-Math.PI/2);
-  ctx.font='9px Courier New'; ctx.fillStyle='rgba(180,140,60,0.6)';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(VERSION, 0, 0);
+  if (myRole && _myRating) {
+    ctx.font='9px Courier New'; ctx.fillStyle='rgba(180,140,60,0.6)';
+    ctx.fillText(VERSION, 0, -5);
+    ctx.font='7px Courier New'; ctx.fillStyle='rgba(168,200,120,0.7)';
+    ctx.fillText(_levelLabel(_myRating) + '  ' + _myRating, 0, +5);
+  } else {
+    ctx.font='9px Courier New'; ctx.fillStyle='rgba(180,140,60,0.6)';
+    ctx.fillText(VERSION, 0, 0);
+  }
   ctx.restore();
   // ── Player flag + name in top/bottom border strips (above/below tray) ──
   const _brdFW=26, _brdFH=17;
