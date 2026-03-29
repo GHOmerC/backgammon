@@ -335,7 +335,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.7-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.8-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -644,7 +644,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v3.7-MP';
+const VERSION    = 'v3.8-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -670,6 +670,24 @@ function _mkPlayerKey(name, ip) {
 function _updateRatingDisplay() {
   const el = document.getElementById('rating-display');
   if (el) el.textContent = _levelLabel(_myRating) + '  ·  ' + _myRating;
+}
+
+function _updateElo(winnerColor, pts) {
+  if (!myRole || !_myPlayerKey) return; // singleplayer or not registered
+  const wRating = (players.white.rating || 1500);
+  const bRating = (players.black.rating || 1500);
+  const winnerRating = winnerColor === 'white' ? wRating : bRating;
+  const loserRating  = winnerColor === 'white' ? bRating : wRating;
+  const expected = 1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));
+  const delta = pts - expected;
+  const iAmWinner = myRole === winnerColor;
+  const myK = _myGamesPlayed < 10 ? 4 : _myGamesPlayed < 30 ? 3 : 2;
+  const change = iAmWinner ? myK * delta : -(myK * delta);
+  _myRating = Math.max(100, Math.round(_myRating + change));
+  _myGamesPlayed++;
+  try {
+    _fbDb.ref('players/' + _myPlayerKey).update({ rating: _myRating, gamesPlayed: _myGamesPlayed, lastSeen: Date.now() });
+  } catch(e) {}
 }
 
 async function _registerPlayer(name) {
@@ -824,6 +842,8 @@ function _listenForState() {
         statusMsg = (data.winner === 'white' ? 'WHITE' : 'BLACK') + suffix;
         statusTimer = 99999;
         playWin(); triggerFireworks(); triggerBillWinAnim(data.winner);
+        const remotePts = data.winType === 'backgammon' ? 3 : data.winType === 'gammon' ? 2 : 1;
+        _updateElo(data.winner, remotePts);
       }
 
       // ── Sound events ──────────────────────────────────────────────
@@ -1893,6 +1913,7 @@ function executeMoveFinal(fromPt, toPt, skipLegalCheck = false) {
       phase='gameover'; statusMsg=(cp==='white'?'WHITE':'BLACK')+suffix;
       statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(cp); turnTimer=-1;
       _gameWinner = cp; _gameWinType = isBackgammon ? 'backgammon' : isGammon ? 'gammon' : 'win';
+      _updateElo(cp, pts);
       pushState('win');
     }
     else if (movesLeft.length === 0) { endTurn(); }
@@ -3076,7 +3097,7 @@ function update(dt) {
       gameScore[opp] += 2; // forfeit = gammon (2 pts)
       phase='gameover'; statusMsg=(currentPlayer==='white'?'WHITE':'BLACK')+' FORFEITS!';
       statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(opp);
-      _gameWinner = opp; turnTimer=-1; pushState('win');
+      _gameWinner = opp; _updateElo(opp, 2); turnTimer=-1; pushState('win');
     }
     // Ticking sound in last 20 seconds — only for the active player
     if (isMyTurn() && turnTimer > 0 && turnTimer <= 1200) {
