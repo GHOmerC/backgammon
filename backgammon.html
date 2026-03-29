@@ -176,13 +176,17 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.3-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v3.4-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
       <input type="text" id="my-name" placeholder="Name (e.g. Omer)" maxlength="14"
              autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
       <select id="my-country"><option value="">— Country (optional) —</option></select>
+      <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="left-base" style="width:16px;height:16px;cursor:pointer;accent-color:#c040d0;">
+        <label for="left-base" style="font-size:11px;letter-spacing:1px;color:#b070c0;cursor:pointer;user-select:none;">HOME BOARD ON LEFT SIDE</label>
+      </div>
     </div>
     <div id="lobby-section">
       <button id="create-btn">⬜  CREATE GAME  (play as White)</button>
@@ -310,7 +314,7 @@ let roomCode = null;
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v3.3-MP';
+const VERSION    = 'v3.4-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -325,6 +329,7 @@ function _genCode() {
 
 let _loopStarted = false;
 function _launchGame() {
+  _leftBase = document.getElementById('left-base').checked;
   document.getElementById('setup-overlay').style.display = 'none';
   document.getElementById('c').style.display = 'block';
   resizeCanvas();
@@ -646,6 +651,7 @@ let _gameWinner   = null; // 'white'|'black' — set on win, read by remote for 
 let _gameWinType  = null; // 'win'|'gammon'|'backgammon' — set alongside _gameWinner
 let _pendingSound = null; // sound event to include in the next pushState call
 let _pendingMoveAnim = null; // {fromPt, toPt, color} — set in executeMove, consumed by pushState
+let _leftBase = false;     // local preference: home board on left side (not synced to opponent)
 const TURN_FRAMES = 3900; // 65 seconds at ~60fps (60s + 5s buffer) — clock appears after first 30s
 
 // ── Audio ─────────────────────────────────────────────────────
@@ -1293,18 +1299,26 @@ function validCombinedDestinations(fromPt) {
   return [...combined].filter(n => !singles.has(n));
 }
 
+// Left-base helpers: when _leftBase, home board (points 1-6/19-24) moves to left of bar
+// Mirror formula: ptLeft_mirrored(n) = 2*IX + IW - ptLeft_original(n) - PT_W
+function barX()  { return _leftBase ? IX + BEAR_W + HALF_W : BAR_X; }
+function bearX() { return _leftBase ? IX : BEAR_X; }
+
 function ptLeft(n) {
-  if (n >= 1  && n <= 6)  return IX + HALF_W + BAR_W + (6  - n) * PT_W;
-  if (n >= 7  && n <= 12) return IX +                  (12 - n) * PT_W;
-  if (n >= 13 && n <= 18) return IX +                  (n - 13) * PT_W;
-  if (n >= 19 && n <= 24) return IX + HALF_W + BAR_W + (n - 19) * PT_W;
+  let orig;
+  if (n >= 1  && n <= 6)  orig = IX + HALF_W + BAR_W + (6  - n) * PT_W;
+  else if (n >= 7  && n <= 12) orig = IX +              (12 - n) * PT_W;
+  else if (n >= 13 && n <= 18) orig = IX +              (n - 13) * PT_W;
+  else if (n >= 19 && n <= 24) orig = IX + HALF_W + BAR_W + (n - 19) * PT_W;
+  return _leftBase ? 2*IX + IW - orig - PT_W : orig;
 }
 function ptCx(n) { return ptLeft(n) + PT_W / 2; }
 
 // Feature 4: extended pointAt that also detects checkers outside triangles
 function pointAt(mx, my) {
-  if (mx >= BAR_X && mx <= BAR_X + BAR_W) return 0;
-  if (mx >= BEAR_X) return 25;
+  const _bx = barX(), _bex = bearX();
+  if (mx >= _bx && mx <= _bx + BAR_W) return 0;
+  if (_leftBase ? mx <= _bex + BEAR_W : mx >= _bex) return 25;
 
   // Check checkers on board (handles overflow outside triangle)
   for (let n = 1; n <= 24; n++) {
@@ -1362,11 +1376,11 @@ function endTurn() {
 function topCheckerVisualPos(pt) {
   if (pt === 0) {
     const count = bar[currentPlayer];
-    return { x: BAR_X + BAR_W/2, y: barCy(currentPlayer, count - 1) };
+    return { x: barX() + BAR_W/2, y: barCy(currentPlayer, count - 1) };
   }
   if (pt === 25) {
     const count = off[currentPlayer];
-    const tx = BEAR_X + BEAR_W/2;
+    const tx = bearX() + BEAR_W/2;
     return { x: tx, y: currentPlayer === 'white' ? IY+IH-7-4-count*17 : IY+7+18+count*17 };
   }
   const p = points[pt];
@@ -1438,11 +1452,11 @@ function executeChainMove(fromPt, path) {
 function approxDestPos(toPt, fromPt) {
   if (toPt === 25) {
     const count = off[currentPlayer];
-    const tx = BEAR_X + BEAR_W/2;
+    const tx = bearX() + BEAR_W/2;
     return { x: tx, y: currentPlayer === 'white' ? IY+IH-7-4-count*17 : IY+7+18+count*17 };
   }
   if (toPt === 0) {
-    return { x: BAR_X + BAR_W/2, y: barCy(currentPlayer, 0) };
+    return { x: barX() + BAR_W/2, y: barCy(currentPlayer, 0) };
   }
   const p = points[toPt];
   const newI = (p.color === currentPlayer || p.count === 0) ? p.count : 0;
@@ -1517,7 +1531,7 @@ function executeMoveFinal(fromPt, toPt, skipLegalCheck = false) {
     const _bx = ptCx(toPt) + checkerXOff(vp(toPt), 0);
     const _by = checkerCy(vp(toPt), 0);
     const _barY = barCy(opp, bar[opp]); // bar[opp] incremented below
-    blotAnim = { x:_bx, y:_by, tx:BAR_X+BAR_W/2, ty:_barY, color:opp, t:0, duration:22 };
+    blotAnim = { x:_bx, y:_by, tx:barX()+BAR_W/2, ty:_barY, color:opp, t:0, duration:22 };
     points[toPt].count = 0; points[toPt].color = null; bar[opp]++;
     statusMsg = (opp==='white'?'White':'Black')+' checker hit!'; statusTimer = 80;
     hitBlot = true; playBlotHit(); _pendingSound = 'blot';
@@ -1608,7 +1622,7 @@ function drawPointCheckers(n) {
 }
 
 function drawBarCheckers() {
-  const bx = BAR_X + BAR_W / 2;
+  const bx = barX() + BAR_W / 2;
   for (let i = 0; i < bar.white; i++) drawChecker(bx, barCy('white', i), 'white');
   for (let i = 0; i < bar.black; i++) drawChecker(bx, barCy('black', i), 'black');
 }
@@ -1624,9 +1638,9 @@ function drawPointHighlight(n, isHit, isCombined) {
     const pulse = .4 + .3 * Math.sin(time * .1);
     const halfY = currentPlayer === 'white' ? IY + IH/2 : IY;
     ctx.fillStyle = isCombined ? `rgba(0,180,255,${pulse})` : `rgba(60,220,80,${pulse})`;
-    ctx.fillRect(BEAR_X+2, halfY+2, BEAR_W-4, IH/2-4);
+    ctx.fillRect(bearX()+2, halfY+2, BEAR_W-4, IH/2-4);
     ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 13px Courier New'; ctx.textAlign='center';
-    ctx.fillText('⬇ OFF', BEAR_X+BEAR_W/2, halfY+IH/4);
+    ctx.fillText('⬇ OFF', bearX()+BEAR_W/2, halfY+IH/4);
     return;
   }
   const x = ptLeft(n);
@@ -1683,7 +1697,7 @@ function drawMovableGlows() {
     // Only bar checkers can move when on bar
     if (validDestinations(0).length > 0) {
       const cnt = bar[currentPlayer];
-      drawGlow(BAR_X + BAR_W / 2, barCy(currentPlayer, cnt - 1));
+      drawGlow(barX() + BAR_W / 2, barCy(currentPlayer, cnt - 1));
     }
     return;
   }
@@ -1704,7 +1718,7 @@ function drawSelectionRing() {
 
   if (selectedPoint === 0) {
     const count = bar[currentPlayer]; if (!count) return;
-    cx = BAR_X + BAR_W / 2;
+    cx = barX() + BAR_W / 2;
     cy = barCy(currentPlayer, count - 1);
   } else {
     const pt = points[selectedPoint]; if (!pt || pt.count === 0) return;
@@ -1921,7 +1935,7 @@ function drawBillGraphic(x, y, w, h, alpha) {
 
 function billTrayPos() {
   const diff = (off.black - off.white) / 15;
-  return { x: BEAR_X+5, y: IY + IH/2 - diff*(IH/2-38) };
+  return { x: bearX()+5, y: IY + IH/2 - diff*(IH/2-38) };
 }
 
 function drawDollarBill() {
@@ -2204,16 +2218,17 @@ function drawPoints() {
 }
 
 function drawBar() {
-  const g=ctx.createLinearGradient(BAR_X,0,BAR_X+BAR_W,0);
+  const bx = barX();
+  const g=ctx.createLinearGradient(bx,0,bx+BAR_W,0);
   g.addColorStop(0,C.woodDark); g.addColorStop(.35,C.bar); g.addColorStop(.65,C.bar); g.addColorStop(1,C.woodDark);
-  ctx.fillStyle=g; ctx.fillRect(BAR_X,IY,BAR_W,IH);
+  ctx.fillStyle=g; ctx.fillRect(bx,IY,BAR_W,IH);
   ctx.strokeStyle=C.woodDark; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(BAR_X,IY); ctx.lineTo(BAR_X,IY+IH); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(BAR_X+BAR_W,IY); ctx.lineTo(BAR_X+BAR_W,IY+IH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx,IY); ctx.lineTo(bx,IY+IH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+BAR_W,IY); ctx.lineTo(bx+BAR_W,IY+IH); ctx.stroke();
   ctx.strokeStyle=C.barLine; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(BAR_X+BAR_W/2,IY+30); ctx.lineTo(BAR_X+BAR_W/2,IY+IH-30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+BAR_W/2,IY+30); ctx.lineTo(bx+BAR_W/2,IY+IH-30); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.save(); ctx.translate(BAR_X+BAR_W/2,IY+IH/2); ctx.rotate(-Math.PI/2);
+  ctx.save(); ctx.translate(bx+BAR_W/2,IY+IH/2); ctx.rotate(-Math.PI/2);
   ctx.fillStyle=C.labelDim; ctx.font='bold 11px Courier New'; ctx.textAlign='center';
   ctx.fillText('BAR',0,4); ctx.restore();
 }
@@ -2444,25 +2459,26 @@ function drawCanvasFlag(code, x, y, w, h) {
 
 // Feature 7: better bear-off contrast for black checkers
 function drawBearOff() {
-  const g=ctx.createLinearGradient(BEAR_X,0,BEAR_X+BEAR_W,0);
+  const bx = bearX();
+  const g=ctx.createLinearGradient(bx,0,bx+BEAR_W,0);
   g.addColorStop(0,C.woodDark); g.addColorStop(.3,C.bearBg); g.addColorStop(1,C.bearBg);
-  ctx.fillStyle=g; ctx.fillRect(BEAR_X,IY,BEAR_W,IH);
+  ctx.fillStyle=g; ctx.fillRect(bx,IY,BEAR_W,IH);
 
   // Lighter background for black checkers area (top half of tray)
-  const lightG = ctx.createLinearGradient(BEAR_X, IY, BEAR_X+BEAR_W, IY+IH/2);
+  const lightG = ctx.createLinearGradient(bx, IY, bx+BEAR_W, IY+IH/2);
   lightG.addColorStop(0, '#3a2510');
   lightG.addColorStop(1, '#4a3020');
   ctx.fillStyle = lightG;
-  ctx.fillRect(BEAR_X+2, IY+2, BEAR_W-4, IH/2-2);
+  ctx.fillRect(bx+2, IY+2, BEAR_W-4, IH/2-2);
 
   ctx.strokeStyle=C.woodDark; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(BEAR_X,IY); ctx.lineTo(BEAR_X,IY+IH); ctx.stroke();
-  const mx=BEAR_X+BEAR_W/2;
+  ctx.beginPath(); ctx.moveTo(bx,IY); ctx.lineTo(bx,IY+IH); ctx.stroke();
+  const mx=bx+BEAR_W/2;
   ctx.strokeStyle=C.bearLine; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(mx,IY+8); ctx.lineTo(mx,IY+IH-8); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(BEAR_X+8,IY+IH/2); ctx.lineTo(BEAR_X+BEAR_W-8,IY+IH/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+8,IY+IH/2); ctx.lineTo(bx+BEAR_W-8,IY+IH/2); ctx.stroke();
   // ── Score only in tray (flags+names now live in the board border strips) ──
-  const _tc = BEAR_X + BEAR_W/2;
+  const _tc = bx + BEAR_W/2;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle='#c0c4ff'; ctx.font='bold 28px Courier New';
   ctx.fillText(gameScore.black, _tc, IY + IH*0.5 - 26);
@@ -2471,7 +2487,7 @@ function drawBearOff() {
   ctx.textBaseline='alphabetic';
 
   // Checker stacks — drawn after labels so they appear on top of flags
-  const mR=7, mG=17, tx=BEAR_X+BEAR_W/2;
+  const mR=7, mG=17, tx=bx+BEAR_W/2;
   for(let i=0;i<off.white;i++){
     const cy=IY+IH-mR-4-i*mG;
     ctx.beginPath(); ctx.arc(tx,cy,mR,0,Math.PI*2);
