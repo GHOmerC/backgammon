@@ -1,5 +1,10 @@
 # Backgammon Changelog
 
+## v4.2-MP
+**Fix transaction cache miss + checkbox alignment**
+- Matchmaking still failed because Firebase transactions receive `null` on first call for uncached nodes, causing an immediate abort. Fix: warm the local cache with `once('value')` before running the transaction.
+- Checkbox label now top-aligns with `margin-top:2px` on the checkbox so it doesn't float to the top when the label text wraps to two lines.
+
 ## v4.1-MP
 **Fix matchmaking — atomic claim via Firebase transaction**
 - Root cause of v4.0 failure: both players rescanned at the same time, both found each other, both tried to become White simultaneously → deadlock

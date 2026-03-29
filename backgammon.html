@@ -353,16 +353,16 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.1-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.2-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
       <input type="text" id="my-name" placeholder="Name (e.g. Omer)" maxlength="14"
              autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
       <select id="my-country"><option value="">— Country (optional) —</option></select>
-      <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-        <input type="checkbox" id="left-base" style="width:16px;height:16px;cursor:pointer;accent-color:#c040d0;flex-shrink:0;">
-        <label for="left-base" style="font-size:11px;letter-spacing:1px;color:#b070c0;cursor:pointer;user-select:none;line-height:16px;">HOME BOARD ON LEFT SIDE <span style="color:#7a5a90;">(optional)</span></label>
+      <div style="margin-top:10px; display:flex; align-items:flex-start; gap:10px;">
+        <input type="checkbox" id="left-base" style="width:16px;height:16px;cursor:pointer;accent-color:#c040d0;flex-shrink:0;margin-top:2px;">
+        <label for="left-base" style="font-size:11px;letter-spacing:1px;color:#b070c0;cursor:pointer;user-select:none;line-height:1.5;">HOME BOARD ON LEFT SIDE <span style="color:#7a5a90;">(optional)</span></label>
       </div>
     </div>
     <div id="rating-display" style="text-align:center; font-size:12px; letter-spacing:2px; color:#a8c878; margin-bottom:12px; min-height:16px;"></div>
@@ -668,7 +668,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.1-MP';
+const VERSION    = 'v4.2-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -732,6 +732,9 @@ function _cancelMatchSearch() {
 // Atomically claim a queue entry using a Firebase transaction.
 // Returns the entry data if claimed, null if someone else got it first.
 async function _claimQueueEntry(key) {
+  // Warm the local cache first — Firebase transactions see null on first run
+  // for uncached nodes, which causes them to abort immediately.
+  await _fbDb.ref('matchQueue/' + key).once('value');
   let claimed = null;
   await _fbDb.ref('matchQueue/' + key).transaction(current => {
     if (!current || current.roomCode !== null) return undefined; // abort — already claimed
