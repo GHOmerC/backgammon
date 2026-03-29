@@ -1,5 +1,12 @@
 # Backgammon Changelog
 
+## v4.5-MP
+**Accept/Decline prompt, leaderboard, stale cleanup, opponent info**
+- 10-second Accept/Decline prompt shown to both players after a match is found; either declining returns both to the queue
+- Opponent's name, level, and rating shown in the prompt (e.g. "⚔ Omer (Club Player · 1542)")
+- Stale queue entries removed automatically on tab close (`beforeunload`)
+- Leaderboard button in lobby — shows top-10 players by rating fetched from Firebase `/players/`
+
 ## v4.4-MP
 **Rewrite matchmaking — split watch/poll, no complex listener logic**
 - Each player watches only their OWN queue entry for a roomCode (join as Black path)

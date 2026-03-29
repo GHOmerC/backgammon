@@ -185,6 +185,36 @@
       letter-spacing: 2px; cursor: pointer;
     }
     #cancel-find-btn:hover { border-color: #e0b84a; color: #e0b84a; }
+    #accept-room { display: none; text-align: center; padding-top: 6px; }
+    #accept-opponent { font-size: 13px; color: #e8c060; letter-spacing: 2px; margin-bottom: 6px; }
+    #accept-countdown { font-size: 28px; font-weight: bold; color: #a8d8f0; margin-bottom: 14px; }
+    #accept-btn, #decline-btn {
+      display: inline-block; padding: 10px 24px; margin: 4px;
+      border-radius: 8px; font-family: 'Courier New', monospace;
+      font-size: 13px; font-weight: bold; letter-spacing: 2px; cursor: pointer;
+      border: none; touch-action: manipulation;
+    }
+    #accept-btn  { background: linear-gradient(135deg, #1a6a1a, #3aaa3a); color: #e8ffe8; }
+    #decline-btn { background: linear-gradient(135deg, #6a1a1a, #aa3a3a); color: #ffe8e8; }
+    #leaderboard-btn {
+      display: block; width: 100%; padding: 9px; margin-bottom: 8px;
+      background: transparent; border: 1px solid #4a3a18; border-radius: 8px;
+      color: #9a8040; font-family: 'Courier New', monospace; font-size: 11px;
+      letter-spacing: 2px; cursor: pointer; touch-action: manipulation;
+    }
+    #leaderboard-btn:hover { border-color: #c9983a; color: #c9983a; }
+    #leaderboard-room { display: none; padding-top: 4px; }
+    #leaderboard-list { list-style: none; padding: 0; margin: 0 0 12px 0; }
+    #leaderboard-list li { font-size: 11px; letter-spacing: 1px; color: #d0c080;
+      padding: 4px 0; border-bottom: 1px solid rgba(201,152,58,0.15); display: flex; justify-content: space-between; }
+    #leaderboard-list li:first-child { color: #e8c060; font-weight: bold; }
+    #close-lb-btn {
+      display: inline-block; padding: 6px 20px;
+      background: transparent; border: 1px solid #6a4a20; border-radius: 6px;
+      color: #b8a070; font-family: 'Courier New', monospace; font-size: 11px;
+      letter-spacing: 2px; cursor: pointer;
+    }
+    #close-lb-btn:hover { border-color: #e0b84a; color: #e0b84a; }
 
     /* ── Vault win overlay ── */
     #vault-overlay {
@@ -353,7 +383,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.4-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.5-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -383,7 +413,18 @@
       <div id="searching-status">🔍  Searching for opponent...</div>
       <button id="cancel-find-btn">CANCEL</button>
     </div>
+    <div id="accept-room">
+      <div id="accept-opponent"></div>
+      <div id="accept-countdown">10</div>
+      <button id="accept-btn">✔  ACCEPT</button>
+      <button id="decline-btn">✖  DECLINE</button>
+    </div>
+    <div id="leaderboard-room">
+      <ul id="leaderboard-list"></ul>
+      <button id="close-lb-btn">CLOSE</button>
+    </div>
     <div id="mp-error"></div>
+    <button id="leaderboard-btn">🏆  LEADERBOARD</button>
   </div>
 </div>
 <canvas id="c"></canvas>
@@ -668,7 +709,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.4-MP';
+const VERSION    = 'v4.5-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -716,6 +757,48 @@ function _updateElo(winnerColor, pts) {
 
 let _matchQueueRef = null; // my own queue entry ref
 let _matchPollInterval = null;
+let _acceptCountdownInterval = null;
+let _pendingMatchInfo = null; // {theirKey, them, name, flag} — held during accept/decline
+
+// ── Stale queue cleanup on tab close ─────────────────────────
+window.addEventListener('beforeunload', () => {
+  if (_matchQueueRef) _matchQueueRef.remove();
+});
+
+// ── Leaderboard ───────────────────────────────────────────────
+async function _showLeaderboard() {
+  document.getElementById('leaderboard-btn').style.display = 'none';
+  document.getElementById('leaderboard-room').style.display = 'block';
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '<li style="color:#888;justify-content:center;">Loading...</li>';
+  try {
+    const snap = await _fbDb.ref('players').orderByChild('rating').limitToLast(10).once('value');
+    const rows = [];
+    snap.forEach(c => { const d = c.val(); if (d && d.name) rows.push(d); });
+    rows.sort((a, b) => (b.rating||1500) - (a.rating||1500));
+    list.innerHTML = rows.map((d, i) =>
+      `<li><span>${i+1}. ${d.name} <span style="color:#888;font-size:9px;">${_levelLabel(d.rating||1500)}</span></span><span>${d.rating||1500}</span></li>`
+    ).join('') || '<li style="color:#888;justify-content:center;">No players yet</li>';
+  } catch(e) { list.innerHTML = '<li style="color:#888;justify-content:center;">Unavailable</li>'; }
+}
+
+// ── Accept / Decline flow ─────────────────────────────────────
+function _showAcceptPrompt(opponentName, opponentRating, onAccept, onDecline) {
+  document.getElementById('searching-room').style.display = 'none';
+  document.getElementById('waiting-room').style.display = 'none';
+  document.getElementById('accept-opponent').textContent =
+    '⚔  ' + opponentName + '  (' + _levelLabel(opponentRating) + '  ·  ' + opponentRating + ')';
+  document.getElementById('accept-room').style.display = 'block';
+  let secs = 10;
+  document.getElementById('accept-countdown').textContent = secs;
+  _acceptCountdownInterval = setInterval(() => {
+    secs--;
+    document.getElementById('accept-countdown').textContent = secs;
+    if (secs <= 0) { clearInterval(_acceptCountdownInterval); onDecline(); }
+  }, 1000);
+  document.getElementById('accept-btn').onclick = () => { clearInterval(_acceptCountdownInterval); document.getElementById('accept-room').style.display = 'none'; onAccept(); };
+  document.getElementById('decline-btn').onclick = () => { clearInterval(_acceptCountdownInterval); document.getElementById('accept-room').style.display = 'none'; onDecline(); };
+}
 
 function _showLobby() {
   document.getElementById('lobby-section').style.display = '';
@@ -729,34 +812,48 @@ function _cancelMatchSearch() {
   _showLobby();
 }
 
-async function _findMatch(name, flag) {
-  await _registerPlayer(name);
-
-  // Write our entry into the queue
+function _backToSearching(name, flag) {
+  // Return to queue after decline or timeout
   _matchQueueRef = _fbDb.ref('matchQueue').push();
-  await _matchQueueRef.set({ name, flag, rating: _myRating, ts: Date.now(), roomCode: null });
+  _matchQueueRef.set({ name, flag, rating: _myRating, ts: Date.now(), roomCode: null });
   const myKey = _matchQueueRef.key;
+  document.getElementById('searching-room').style.display = 'block';
   document.getElementById('searching-status').textContent = '🔍  Searching for opponent...';
+  _startMatchListeners(name, flag, myKey);
+}
 
-  // Watch OWN entry — fires when someone writes a roomCode into it (we become Black)
+function _startMatchListeners(name, flag, myKey) {
+  // Watch OWN entry — fires when White writes a roomCode into it (we become Black)
   _matchQueueRef.on('value', snap => {
     const d = snap.val();
     if (!d || !d.roomCode) return;
+    const theirRoomCode = d.roomCode;
     _matchQueueRef.off('value');
     if (_matchPollInterval) { clearInterval(_matchPollInterval); _matchPollInterval = null; }
     _matchQueueRef.remove();
     _matchQueueRef = null;
-    roomCode = d.roomCode;
-    myRole   = 'black';
-    _fbRoom  = _fbDb.ref('rooms/' + roomCode);
-    _fbRoom.child('players/white').once('value', snap2 => {
+    // Fetch White's info for accept prompt
+    _fbDb.ref('rooms/' + theirRoomCode + '/players/white').once('value', snap2 => {
       const wh = snap2.val();
-      players.white = { name: wh ? wh.name : '?', flag: wh ? wh.flag||'' : '',
-                        rating: wh ? wh.rating||1500 : 1500, level: _levelLabel(wh ? wh.rating||1500 : 1500) };
-      players.black = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-      _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-      document.getElementById('searching-room').style.display = 'none';
-      _listenForState();
+      const oppName   = wh ? wh.name   : '?';
+      const oppRating = wh ? wh.rating||1500 : 1500;
+      _showAcceptPrompt(oppName, oppRating,
+        () => {
+          // Accepted — join as Black
+          roomCode = theirRoomCode;
+          myRole   = 'black';
+          _fbRoom  = _fbDb.ref('rooms/' + roomCode);
+          players.white = { name: oppName, flag: wh ? wh.flag||'' : '', rating: oppRating, level: _levelLabel(oppRating) };
+          players.black = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
+          _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
+          _listenForState();
+        },
+        () => {
+          // Declined — clean up room, go back to searching
+          _fbDb.ref('rooms/' + theirRoomCode).remove();
+          _backToSearching(name, flag);
+        }
+      );
     });
   });
 
@@ -765,23 +862,21 @@ async function _findMatch(name, flag) {
     if (!_matchQueueRef) { clearInterval(_matchPollInterval); _matchPollInterval = null; return; }
     const now = Date.now();
     const snap = await _fbDb.ref('matchQueue').once('value');
-    // Find best unclaimed opponent
     let bestKey = null, bestDiff = Infinity, bestTs = Infinity;
     snap.forEach(child => {
       if (child.key === myKey) return;
       const d = child.val();
-      if (!d || d.roomCode) return;          // skip claimed
-      if (now - d.ts > 30000) return;        // skip stale
+      if (!d || d.roomCode) return;
+      if (now - d.ts > 30000) return;
       const diff = Math.abs((d.rating || 1500) - _myRating);
       if (diff < bestDiff || (diff === bestDiff && d.ts < bestTs)) {
         bestDiff = diff; bestTs = d.ts; bestKey = child.key;
       }
     });
     if (!bestKey) return;
-    // Tie-break: smaller key becomes White (both players poll — only one acts)
-    if (myKey > bestKey) return;
+    if (myKey > bestKey) return; // smaller key acts as White
 
-    // I become White — claim the match
+    // Become White — stop listening, claim the match
     clearInterval(_matchPollInterval); _matchPollInterval = null;
     if (!_matchQueueRef) return;
     _matchQueueRef.off('value');
@@ -789,32 +884,53 @@ async function _findMatch(name, flag) {
     _matchQueueRef = null;
 
     const them = snap.child(bestKey).val();
-    roomCode   = _genCode();
-    _sessionId = Math.random().toString(36).slice(2, 10);
-    _fbRoom    = _fbDb.ref('rooms/' + roomCode);
-    myRole     = 'white';
-    players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-    players.black = { name: them.name, flag: them.flag||'', rating: them.rating||1500, level: _levelLabel(them.rating||1500) };
-    await _fbRoom.remove();
-    await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-    // Write roomCode into their entry — their own-entry watcher will see it and join as Black
-    await _fbDb.ref('matchQueue/' + bestKey).update({ roomCode });
-    setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 8000);
+    const oppName   = them.name;
+    const oppRating = them.rating || 1500;
 
-    document.getElementById('searching-room').style.display = 'none';
-    document.getElementById('room-code-display').textContent = roomCode;
-    document.getElementById('waiting-room').style.display = 'block';
-    document.getElementById('waiting-status').textContent = 'Match found! Connecting...';
-    let _joined = false;
-    _fbRoom.child('players/black').on('value', snap2 => {
-      const bl = snap2.val();
-      if (!bl || !bl.name || bl.name === '...' || _joined) return;
-      _joined = true;
-      _fbRoom.child('players/black').off('value');
-      players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
-      _launchGame(); _listenForState(); pushState();
-    });
+    // Show accept prompt before committing
+    _showAcceptPrompt(oppName, oppRating,
+      async () => {
+        // Accepted — create room, notify Black
+        roomCode   = _genCode();
+        _sessionId = Math.random().toString(36).slice(2, 10);
+        _fbRoom    = _fbDb.ref('rooms/' + roomCode);
+        myRole     = 'white';
+        players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
+        players.black = { name: oppName, flag: them.flag||'', rating: oppRating, level: _levelLabel(oppRating) };
+        await _fbRoom.remove();
+        await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
+        await _fbDb.ref('matchQueue/' + bestKey).update({ roomCode });
+        setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 8000);
+        // Wait for Black to accept and write their record
+        let _joined = false;
+        _fbRoom.child('players/black').on('value', snap2 => {
+          const bl = snap2.val();
+          if (!bl || !bl.name || bl.name === '...' || _joined) return;
+          _joined = true;
+          _fbRoom.child('players/black').off('value');
+          players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
+          _launchGame(); _listenForState(); pushState();
+        });
+        // Show "Match found! Waiting for opponent to accept..."
+        document.getElementById('waiting-room').style.display = 'block';
+        document.getElementById('waiting-status').textContent = 'Match found! Waiting for opponent...';
+      },
+      () => {
+        // Declined — remove roomCode from their entry so they go back to searching
+        _fbDb.ref('matchQueue/' + bestKey).update({ roomCode: null, ts: Date.now() });
+        _backToSearching(name, flag);
+      }
+    );
   }, 2000);
+}
+
+async function _findMatch(name, flag) {
+  await _registerPlayer(name);
+  _matchQueueRef = _fbDb.ref('matchQueue').push();
+  await _matchQueueRef.set({ name, flag, rating: _myRating, ts: Date.now(), roomCode: null });
+  const myKey = _matchQueueRef.key;
+  document.getElementById('searching-status').textContent = '🔍  Searching for opponent...';
+  _startMatchListeners(name, flag, myKey);
 }
 
 async function _registerPlayer(name) {
@@ -1135,6 +1251,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-find-btn').addEventListener('click', () => {
     _cancelMatchSearch();
     showErr('');
+  });
+
+  document.getElementById('leaderboard-btn').addEventListener('click', () => {
+    _fbInit();
+    document.getElementById('leaderboard-room').style.display = 'block';
+    document.getElementById('leaderboard-btn').style.display = 'none';
+    _showLeaderboard();
+  });
+  document.getElementById('close-lb-btn').addEventListener('click', () => {
+    document.getElementById('leaderboard-room').style.display = 'none';
+    document.getElementById('leaderboard-btn').style.display = 'block';
   });
 });
 
