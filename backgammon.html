@@ -362,7 +362,8 @@ function _listenForState() {
           const endPos   = approxDestPos(ma.toPt, ma.fromPt);
           remoteAnim = { fromPt: ma.fromPt, toPt: ma.toPt, color: ma.color,
                          x: startPos.x, y: startPos.y, tx: endPos.x, ty: endPos.y,
-                         t: 0, duration: 18, done: false, remainingPath: [] };
+                         t: 0, duration: 18, done: false, remainingPath: [],
+                         visualOnly: true };
         } catch(e) {}
         currentPlayer = savedPlayer;
       }
@@ -430,7 +431,10 @@ function _listenForState() {
           : null;
         _showStaticDice(dice, positions);
       } else if (phase === 'opening_b' && openingDice[0]) {
-        _showStaticDice([openingDice[0]]);
+        const obPos = data.dicePositions
+          ? (Array.isArray(data.dicePositions) ? data.dicePositions : Object.values(data.dicePositions))
+          : null;
+        _showStaticDice([openingDice[0]], obPos);
       } else if (!isRollingPhase) {
         dicePhysics = [];
       }
@@ -506,8 +510,9 @@ function pushState(soundEvent = null) {
     diceInitState: (phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling')
       ? dicePhysics.map(d => ({x:d.x,y:d.y,vx:d.vx,vy:d.vy,rotation:d.rotation,angularVel:d.angularVel,value:d.value,half:d.half||1,stopped:d.stopped||false}))
       : null,
-    // Dice final positions — remote snaps dice to same spots after roll settles
-    dicePositions: phase === 'rolled'
+    // Dice final positions — remote snaps dice to same spots after roll settles.
+    // Also sent for opening_b so Black knows exact landing position of White's die.
+    dicePositions: (phase === 'rolled' || phase === 'opening_b')
       ? dicePhysics.map(d => ({x:d.x, y:d.y}))
       : null
   });
@@ -2641,9 +2646,14 @@ function update(dt) {
     if (checkerAnim.t >= checkerAnim.duration) {
       const fp = checkerAnim.fromPt, tp = checkerAnim.toPt;
       const remaining = checkerAnim.remainingPath || [];
+      const isVisual = checkerAnim.visualOnly;
       checkerAnim = null;
-      executeMoveFinal(fp, tp, remaining.length > 0);
-      if (remaining.length > 0) executeChainMove(tp, remaining);
+      if (!isVisual) {
+        // Local move: apply state changes
+        executeMoveFinal(fp, tp, remaining.length > 0);
+        if (remaining.length > 0) executeChainMove(tp, remaining);
+      }
+      // Remote (visualOnly): board state already applied from Firebase — animation only
     }
   }
 
