@@ -1,5 +1,11 @@
 # Backgammon Changelog
 
+## v4.0-MP
+**Fix matchmaking race condition**
+- Both players clicking "Find a Match" at the same time would both see an empty queue, both add themselves, and neither would ever find the other
+- Fix: after adding yourself to the queue, re-scan every 4 seconds for newly arrived players
+- First to find a match in the rescan becomes White and claims the other player
+
 ## v3.9-MP
 **Find a Match — ELO-based auto matchmaking**
 - New "FIND A MATCH" button in lobby (blue, above Create/Join)
