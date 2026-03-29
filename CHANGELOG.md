@@ -1,5 +1,12 @@
 # Backgammon Changelog
 
+## v4.4-MP
+**Rewrite matchmaking — split watch/poll, no complex listener logic**
+- Each player watches only their OWN queue entry for a roomCode (join as Black path)
+- Separate `setInterval` polls the full queue every 2s (become White path)
+- Smaller Firebase key wins the tie-break — exactly one player becomes White
+- `_matchPollInterval` tracked globally so Cancel cleans it up properly
+
 ## v4.3-MP
 **Rewrite matchmaking — deterministic key-comparison, no transactions**
 - Removed transaction and interval polling entirely

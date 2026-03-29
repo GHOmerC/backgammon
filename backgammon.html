@@ -353,7 +353,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.3-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.4-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -668,7 +668,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.3-MP';
+const VERSION    = 'v4.4-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -715,6 +715,8 @@ function _updateElo(winnerColor, pts) {
 }
 
 let _matchQueueRef = null; // my own queue entry ref
+let _matchPollInterval = null;
+
 function _showLobby() {
   document.getElementById('lobby-section').style.display = '';
   document.getElementById('waiting-room').style.display = 'none';
@@ -722,8 +724,8 @@ function _showLobby() {
 }
 
 function _cancelMatchSearch() {
-  _fbDb.ref('matchQueue').off('value');
-  if (_matchQueueRef) { _matchQueueRef.remove(); _matchQueueRef = null; }
+  if (_matchPollInterval) { clearInterval(_matchPollInterval); _matchPollInterval = null; }
+  if (_matchQueueRef) { _matchQueueRef.off('value'); _matchQueueRef.remove(); _matchQueueRef = null; }
   _showLobby();
 }
 
@@ -736,57 +738,57 @@ async function _findMatch(name, flag) {
   const myKey = _matchQueueRef.key;
   document.getElementById('searching-status').textContent = '🔍  Searching for opponent...';
 
-  // Watch the whole queue in real-time
-  _fbDb.ref('matchQueue').on('value', async snap => {
-    if (!_matchQueueRef) return; // cancelled
-
-    // Check if someone paired us as Black
-    const myData = snap.child(myKey).val();
-    if (!myData) return;
-    if (myData.roomCode && myData.roomCode !== null) {
-      // We've been paired — join as Black
-      _fbDb.ref('matchQueue').off('value');
-      _matchQueueRef = null;
-      roomCode = myData.roomCode;
-      myRole   = 'black';
-      _fbRoom  = _fbDb.ref('rooms/' + roomCode);
-      const wSnap = await _fbRoom.child('players/white').once('value');
-      const wh = wSnap.val();
+  // Watch OWN entry — fires when someone writes a roomCode into it (we become Black)
+  _matchQueueRef.on('value', snap => {
+    const d = snap.val();
+    if (!d || !d.roomCode) return;
+    _matchQueueRef.off('value');
+    if (_matchPollInterval) { clearInterval(_matchPollInterval); _matchPollInterval = null; }
+    _matchQueueRef.remove();
+    _matchQueueRef = null;
+    roomCode = d.roomCode;
+    myRole   = 'black';
+    _fbRoom  = _fbDb.ref('rooms/' + roomCode);
+    _fbRoom.child('players/white').once('value', snap2 => {
+      const wh = snap2.val();
       players.white = { name: wh ? wh.name : '?', flag: wh ? wh.flag||'' : '',
                         rating: wh ? wh.rating||1500 : 1500, level: _levelLabel(wh ? wh.rating||1500 : 1500) };
       players.black = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
-      await _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
+      _fbRoom.child('players/black').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
       document.getElementById('searching-room').style.display = 'none';
       _listenForState();
-      return;
-    }
+    });
+  });
 
-    // Find best opponent among other unclaimed entries
+  // Poll queue every 2s — if we find someone AND we have the smaller key, we become White
+  _matchPollInterval = setInterval(async () => {
+    if (!_matchQueueRef) { clearInterval(_matchPollInterval); _matchPollInterval = null; return; }
     const now = Date.now();
+    const snap = await _fbDb.ref('matchQueue').once('value');
+    // Find best unclaimed opponent
     let bestKey = null, bestDiff = Infinity, bestTs = Infinity;
     snap.forEach(child => {
       if (child.key === myKey) return;
       const d = child.val();
-      if (!d || d.roomCode !== null) return;
-      if (now - d.ts > 30000) return;
+      if (!d || d.roomCode) return;          // skip claimed
+      if (now - d.ts > 30000) return;        // skip stale
       const diff = Math.abs((d.rating || 1500) - _myRating);
       if (diff < bestDiff || (diff === bestDiff && d.ts < bestTs)) {
         bestDiff = diff; bestTs = d.ts; bestKey = child.key;
       }
     });
     if (!bestKey) return;
+    // Tie-break: smaller key becomes White (both players poll — only one acts)
+    if (myKey > bestKey) return;
 
-    // Deterministic tie-break: smaller Firebase key becomes White.
-    // This guarantees exactly one player acts even if both fire simultaneously.
-    if (myKey > bestKey) return; // the other player (smaller key) will handle it
-
-    // I am White — pair us
-    const them = snap.child(bestKey).val();
-    if (!them) return;
-    _fbDb.ref('matchQueue').off('value');
+    // I become White — claim the match
+    clearInterval(_matchPollInterval); _matchPollInterval = null;
+    if (!_matchQueueRef) return;
+    _matchQueueRef.off('value');
     _matchQueueRef.remove();
     _matchQueueRef = null;
 
+    const them = snap.child(bestKey).val();
     roomCode   = _genCode();
     _sessionId = Math.random().toString(36).slice(2, 10);
     _fbRoom    = _fbDb.ref('rooms/' + roomCode);
@@ -795,9 +797,9 @@ async function _findMatch(name, flag) {
     players.black = { name: them.name, flag: them.flag||'', rating: them.rating||1500, level: _levelLabel(them.rating||1500) };
     await _fbRoom.remove();
     await _fbRoom.child('players/white').set({ name, flag, rating: _myRating, level: _levelLabel(_myRating) });
-    // Write roomCode into their entry — this wakes them up as Black
+    // Write roomCode into their entry — their own-entry watcher will see it and join as Black
     await _fbDb.ref('matchQueue/' + bestKey).update({ roomCode });
-    setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 5000);
+    setTimeout(() => _fbDb.ref('matchQueue/' + bestKey).remove(), 8000);
 
     document.getElementById('searching-room').style.display = 'none';
     document.getElementById('room-code-display').textContent = roomCode;
@@ -812,7 +814,7 @@ async function _findMatch(name, flag) {
       players.black = { name: bl.name, flag: bl.flag||'', rating: bl.rating||1500, level: _levelLabel(bl.rating||1500) };
       _launchGame(); _listenForState(); pushState();
     });
-  });
+  }, 2000);
 }
 
 async function _registerPlayer(name) {
