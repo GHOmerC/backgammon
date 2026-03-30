@@ -63,6 +63,74 @@
       /* Hide everything else while in portrait on a small screen */
       #setup-overlay, canvas, #subtitle { visibility: hidden; }
     }
+    /* ── Disclaimer overlay ── */
+    #disclaimer-overlay {
+      position: fixed; top:0; left:0; right:0; bottom:0;
+      background: rgba(5,4,2,0.98);
+      display: flex; align-items: flex-start; justify-content: center;
+      z-index: 200; font-family: 'Courier New', monospace;
+      overflow-y: auto; padding: 24px 16px;
+    }
+    #disclaimer-box {
+      background: #0e0a04; border: 2px solid #c9983a;
+      border-radius: 14px; padding: 30px 36px 28px;
+      width: min(680px, 100%); color: #f0ddb0; margin: auto;
+    }
+    #disclaimer-box h2 {
+      text-align: center; color: #e8c060; font-size: 20px;
+      letter-spacing: 5px; margin-bottom: 4px;
+    }
+    #disclaimer-box .disc-subtitle {
+      text-align: center; font-size: 11px; color: #7a6030;
+      letter-spacing: 2px; margin-bottom: 22px;
+    }
+    #disclaimer-box h3 {
+      color: #e8c060; font-size: 13px; letter-spacing: 2px;
+      margin: 20px 0 8px; text-transform: uppercase;
+    }
+    #disclaimer-box .summary-list {
+      list-style: none; padding: 0; margin: 0 0 20px;
+    }
+    #disclaimer-box .summary-list li {
+      font-size: 12px; color: #c8b070; letter-spacing: 0.5px;
+      line-height: 1.7; padding: 3px 0;
+      border-bottom: 1px solid rgba(201,152,58,0.12);
+    }
+    #disclaimer-box .summary-list li:last-child { border-bottom: none; }
+    #disclaimer-box .summary-list li span.num {
+      color: #e8c060; font-weight: bold; margin-right: 8px;
+    }
+    .disc-divider {
+      border: none; border-top: 1px solid rgba(201,152,58,0.3); margin: 22px 0;
+    }
+    #disclaimer-box .detail-section { margin-bottom: 18px; }
+    #disclaimer-box .detail-section h4 {
+      color: #e8c060; font-size: 12px; letter-spacing: 1.5px;
+      margin-bottom: 6px; text-transform: uppercase;
+    }
+    #disclaimer-box .detail-section p {
+      font-size: 11px; color: #b8a070; line-height: 1.75; letter-spacing: 0.3px;
+    }
+    #disclaimer-box .disc-agree-row {
+      margin-top: 24px; display: flex; align-items: center; gap: 14px;
+      border-top: 1px solid rgba(201,152,58,0.3); padding-top: 18px;
+    }
+    #disclaimer-box .disc-agree-row input[type=checkbox] {
+      width: 16px; height: 16px; accent-color: #e8c060; flex-shrink: 0; cursor: pointer;
+    }
+    #disclaimer-box .disc-agree-row label {
+      font-size: 11px; color: #c8b070; letter-spacing: 0.5px; cursor: pointer;
+    }
+    #btn-disclaimer-accept {
+      display: block; width: 100%; margin-top: 16px;
+      padding: 12px; background: #c9983a; color: #0e0a04;
+      border: none; border-radius: 8px; font-family: 'Courier New', monospace;
+      font-size: 14px; font-weight: bold; letter-spacing: 3px;
+      cursor: pointer; transition: background .2s;
+    }
+    #btn-disclaimer-accept:hover { background: #e8b840; }
+    #btn-disclaimer-accept:disabled { background: #4a3a1a; color: #7a6030; cursor: not-allowed; }
+
     #setup-overlay {
       position: fixed; top:0; left:0; right:0; bottom:0;
       background: rgba(5,4,2,0.96);
@@ -405,6 +473,61 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <body>
+<div id="disclaimer-overlay" style="display:none">
+  <div id="disclaimer-box">
+    <h2>BACKGAMMON</h2>
+    <p class="disc-subtitle">TERMS OF USE &amp; DISCLAIMER — PLEASE READ BEFORE PLAYING</p>
+
+    <h3>Quick Summary</h3>
+    <ul class="summary-list">
+      <li><span class="num">1.</span> This site is for <strong>entertainment only</strong> — no real money, no gambling.</li>
+      <li><span class="num">2.</span> You must be <strong>18 years or older</strong> to use this site.</li>
+      <li><span class="num">3.</span> We collect limited data (player name, session data via Firebase). No account required.</li>
+      <li><span class="num">4.</span> The site is provided <strong>"as is"</strong> — no guarantees of uptime, data persistence, or accuracy.</li>
+      <li><span class="num">5.</span> The site owner is <strong>not liable</strong> for any loss, damage, or inconvenience arising from use.</li>
+      <li><span class="num">6.</span> By clicking "I Agree," you confirm you have read and accept all terms below.</li>
+    </ul>
+
+    <hr class="disc-divider">
+
+    <div class="detail-section">
+      <h4>1. Entertainment Purpose &amp; No Gambling</h4>
+      <p>This website offers a digital backgammon game for recreational and social entertainment only. No real currency, cryptocurrency, or items of monetary value are wagered, won, or lost through gameplay. Any in-game imagery (including "$100 bill" graphics) is purely decorative and symbolic. This site does not constitute an online gambling platform under any jurisdiction.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>2. Age Requirement</h4>
+      <p>You must be at least 18 years of age to access and use this site. By accepting these terms, you confirm that you are 18 or older. If you are under 18, you are not permitted to use this site. The site owner assumes no liability for access by minors in violation of this requirement.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>3. Data Collection &amp; Privacy</h4>
+      <p>This site stores minimal data necessary to operate multiplayer sessions. Player names and game state are temporarily stored in Google Firebase Realtime Database. Your browser's local storage is used solely to remember that you have accepted this disclaimer — no personal profile is created. No email address, payment information, or sensitive personal data is collected. Data stored in Firebase may be retained for a limited period and is subject to Google's Privacy Policy. By using this site you consent to this limited data use.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>4. No Warranty &amp; Limitation of Liability</h4>
+      <p>This site is provided "as is" and "as available," without warranty of any kind — express or implied — including but not limited to fitness for a particular purpose, uninterrupted availability, or freedom from errors. The site owner shall not be liable for any direct, indirect, incidental, special, or consequential damages arising out of or related to your use (or inability to use) this site, including loss of game data, session disconnections, or software bugs.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>5. Intellectual Property</h4>
+      <p>All game code, graphics, and design elements on this site are the property of the site owner. You may not copy, distribute, modify, or create derivative works without explicit written permission. Use of this site grants you a limited, non-exclusive, non-transferable license to play the game for personal, non-commercial purposes only.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>6. Acceptance of Terms</h4>
+      <p>By checking the box below and clicking "I Agree &amp; Play," you acknowledge that you have read, understood, and agree to be bound by these terms. These terms may be updated at any time; continued use of the site constitutes acceptance of any revised terms. If you do not agree, please close this page.</p>
+    </div>
+
+    <div class="disc-agree-row">
+      <input type="checkbox" id="disc-check" onchange="document.getElementById('btn-disclaimer-accept').disabled=!this.checked">
+      <label for="disc-check">I confirm I am 18 or older, I have read the above terms, and I agree to them.</label>
+    </div>
+    <button id="btn-disclaimer-accept" disabled onclick="_disclaimerAccept()">I AGREE &amp; PLAY</button>
+  </div>
+</div>
+
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
@@ -638,6 +761,20 @@
 // ════════════════════════════════════════════════════════════
 //  BACKGAMMON — Multi-floor stacking + 3D board
 // ════════════════════════════════════════════════════════════
+
+// ── Disclaimer ───────────────────────────────────────────────
+(function() {
+  const KEY = 'backgammon_disclaimer_v1';
+  if (!localStorage.getItem(KEY)) {
+    document.getElementById('disclaimer-overlay').style.display = 'flex';
+    document.getElementById('setup-overlay').style.display = 'none';
+  }
+})();
+function _disclaimerAccept() {
+  localStorage.setItem('backgammon_disclaimer_v1', '1');
+  document.getElementById('disclaimer-overlay').style.display = 'none';
+  document.getElementById('setup-overlay').style.display = 'flex';
+}
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
