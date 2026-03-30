@@ -408,7 +408,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.9-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.0-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -742,7 +742,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.9-MP';
+const VERSION    = 'v5.0-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -3498,18 +3498,18 @@ function drawBoard() {
   const _brdNameX = _brdRight - _brdFW - 4;
   // Black — top border
   ctx.fillStyle='#a8aae8'; ctx.font='bold 12px Courier New'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  ctx.fillText(players.black.name.substring(0,7), _brdNameX - 2, BY+6);
+  ctx.fillText(players.black.name.substring(0,7), _brdNameX - 2, BY+5);
   if (myRole && players.black.rating) {
-    ctx.font='7px Courier New'; ctx.fillStyle='rgba(168,170,232,0.7)';
-    ctx.fillText(_levelLabel(players.black.rating) + ' ' + players.black.rating, _brdNameX - 2, BY+13);
+    ctx.font='9px Courier New'; ctx.fillStyle='rgba(168,170,232,0.85)';
+    ctx.fillText(_levelLabel(players.black.rating) + '  ' + players.black.rating, _brdNameX - 2, BY+15);
   }
   drawCanvasFlag(players.black.flag, _brdRight - _brdFW, BY+1, _brdFW, _brdFH);
   // White — bottom border
   ctx.fillStyle='#d0b880'; ctx.font='bold 12px Courier New'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  ctx.fillText(players.white.name.substring(0,7), _brdNameX - 2, IY+IH+6);
+  ctx.fillText(players.white.name.substring(0,7), _brdNameX - 2, IY+IH+5);
   if (myRole && players.white.rating) {
-    ctx.font='7px Courier New'; ctx.fillStyle='rgba(208,184,128,0.7)';
-    ctx.fillText(_levelLabel(players.white.rating) + ' ' + players.white.rating, _brdNameX - 2, IY+IH+13);
+    ctx.font='9px Courier New'; ctx.fillStyle='rgba(208,184,128,0.85)';
+    ctx.fillText(_levelLabel(players.white.rating) + '  ' + players.white.rating, _brdNameX - 2, IY+IH+15);
   }
   drawCanvasFlag(players.white.flag, _brdRight - _brdFW, IY+IH+1, _brdFW, _brdFH);
   ctx.textBaseline='alphabetic';
@@ -3675,7 +3675,7 @@ document.addEventListener('keydown', e => {
     else if(phase==='gameover'){ if(_fbRoom && myRole==='white'){_fbRoom.remove();_fbRoom=null;} initBoard(); phase='title'; }
     else if(phase==='opening'  && isMyTurn()){ rollOpeningWhite(); }
     else if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); }
-    else if(isMyTurn()){ rollDice(); }
+    else if(isMyTurn() && !_timeoutPending){ rollDice(); }
   }
   if(e.key==='Escape'){ selectedPoint=null; highlights=[]; combinedHighlights=[]; }
 });
@@ -3687,7 +3687,7 @@ function handleBoardTap(clientX, clientY) {
   if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); return; }
   if((phase==='opening'||phase==='opening_b') && !isMyTurn()) return;
   if(!isMyTurn()) return;
-  if(phase==='idle' && skipTimer===0){ rollDice(); return; }
+  if(phase==='idle' && skipTimer===0 && !_timeoutPending){ rollDice(); return; }
   if(phase!=='rolled'||skipTimer>0) return;
   if(checkerAnim && !checkerAnim.done) return;
 
@@ -3758,7 +3758,7 @@ _rollBtn && _rollBtn.addEventListener('click', () => {
   else if(phase==='gameover'){ if(_fbRoom && myRole==='white'){_fbRoom.remove();_fbRoom=null;} initBoard(); phase='title'; }
   else if(phase==='opening'  && isMyTurn()){ rollOpeningWhite(); }
   else if(phase==='opening_b'&& isMyTurn()){ rollOpeningBlack(); }
-  else if(phase==='idle'     && isMyTurn()){ rollDice(); }
+  else if(phase==='idle'     && isMyTurn() && !_timeoutPending){ rollDice(); }
 });
 
 initBoard();

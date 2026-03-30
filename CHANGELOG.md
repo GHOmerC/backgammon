@@ -1,5 +1,10 @@
 # Backgammon Changelog
 
+## v5.0-MP
+**Fix clock forfeit + larger rating text**
+- Clock forfeit: added `!_timeoutPending` guard to keydown handler, tap/click handler, and Roll button — active player can no longer roll after their time expires
+- Rating/level text in border strips: increased from 7px → 9px, bumped to bottom of border strip (`BY+15` / `IY+IH+15`), opacity raised to 0.85 for better readability
+
 ## v4.9-MP
 **Fix double opening dice roll**
 - Root cause: `update()` ran the opening roll resolution for *both* players. When White's physics simulation finished for `opening_b_rolling`, White resolved the winner using `openingDice[1]` — which might be 0 (not yet received from Firebase) if Black's state push was still in transit. This caused White to push an incorrect `phase='rolled'` with White as winner, which Black then received and overrode, creating a second visible cycle.
