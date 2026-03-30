@@ -67,14 +67,15 @@
     #disclaimer-overlay {
       position: fixed; top:0; left:0; right:0; bottom:0;
       background: rgba(5,4,2,0.98);
-      display: flex; align-items: flex-start; justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       z-index: 200; font-family: 'Courier New', monospace;
-      overflow-y: auto; padding: 24px 16px;
+      padding: 16px;
     }
     #disclaimer-box {
       background: #0e0a04; border: 2px solid #c9983a;
       border-radius: 14px; padding: 30px 36px 28px;
       width: min(680px, 100%); color: #f0ddb0; margin: auto;
+      max-height: 90vh; overflow-y: auto;
     }
     #disclaimer-box h2 {
       text-align: center; color: #e8c060; font-size: 20px;
@@ -476,62 +477,84 @@
 <div id="disclaimer-overlay" style="display:none">
   <div id="disclaimer-box">
     <h2>BACKGAMMON</h2>
-    <p class="disc-subtitle">TERMS OF USE &amp; DISCLAIMER — PLEASE READ BEFORE PLAYING</p>
+    <p class="disc-subtitle">TERMS OF USE — PLEASE READ BEFORE PLAYING</p>
 
     <h3>Quick Summary</h3>
     <ul class="summary-list">
-      <li><span class="num">1.</span> This site is for <strong>entertainment only</strong> — no real money, no gambling.</li>
-      <li><span class="num">2.</span> You must be <strong>18 years or older</strong> to use this site.</li>
-      <li><span class="num">3.</span> We collect limited data (player name, session data via Firebase). No account required.</li>
-      <li><span class="num">4.</span> The site is provided <strong>"as is"</strong> — no guarantees of uptime, data persistence, or accuracy.</li>
-      <li><span class="num">5.</span> The site owner is <strong>not liable</strong> for any loss, damage, or inconvenience arising from use.</li>
-      <li><span class="num">6.</span> By clicking "I Agree," you confirm you have read and accept all terms below.</li>
+      <li>This game is for <strong>entertainment only</strong> — no real money, no gambling.</li>
+      <li>You must be <strong>18 years or older</strong> to use this site.</li>
+      <li>We store <strong>minimal data only</strong> (player name + temporary game session via Firebase). No accounts, no sensitive data.</li>
+      <li>The game is provided <strong>"as is"</strong> — it may have bugs, disconnects, or data loss.</li>
+      <li>The site owner is <strong>not liable</strong> for any issues, losses, or damages from using the game.</li>
+      <li>By clicking "I Agree &amp; Play," you accept the full Terms of Use below.</li>
     </ul>
+    <p style="font-size:11px; color:#a08040; margin: 4px 0 16px; letter-spacing:0.3px;">
+      👉 <a href="#disc-full-terms" onclick="this.closest('#disclaimer-box').scrollTop=this.closest('#disclaimer-box').querySelector('#disc-full-terms').offsetTop-10; return false;"
+         style="color:#e8c060; text-decoration:underline; cursor:pointer;">Read the full Terms of Use below</a>
+    </p>
 
-    <hr class="disc-divider">
+    <div class="disc-agree-row">
+      <input type="checkbox" id="disc-check" onchange="document.getElementById('btn-disclaimer-accept').disabled=!this.checked">
+      <label for="disc-check">I am 18+ and agree to the Terms of Use.</label>
+    </div>
+    <button id="btn-disclaimer-accept" disabled onclick="_disclaimerAccept()">I AGREE &amp; PLAY</button>
+
+    <hr class="disc-divider" id="disc-full-terms">
 
     <div class="detail-section">
       <h4>1. Entertainment Purpose &amp; No Gambling</h4>
-      <p>This website offers a digital backgammon game for recreational and social entertainment only. No real currency, cryptocurrency, or items of monetary value are wagered, won, or lost through gameplay. Any in-game imagery (including "$100 bill" graphics) is purely decorative and symbolic. This site does not constitute an online gambling platform under any jurisdiction.</p>
+      <p>This website provides a digital backgammon game for recreational and social entertainment only. No real currency, cryptocurrency, or items of monetary value are wagered, won, or lost through gameplay. Any in-game imagery (including depictions of currency) is purely decorative and has no real-world value.<br><br>
+      This site is not intended to constitute, and should not be interpreted as, a gambling service under any applicable laws or regulations.</p>
     </div>
 
     <div class="detail-section">
       <h4>2. Age Requirement</h4>
-      <p>You must be at least 18 years of age to access and use this site. By accepting these terms, you confirm that you are 18 or older. If you are under 18, you are not permitted to use this site. The site owner assumes no liability for access by minors in violation of this requirement.</p>
+      <p>You must be at least 18 years of age to access or use this site. By using the site, you represent and warrant that you are 18 years or older.<br><br>
+      This age restriction is intended to ensure compliance with applicable laws and to avoid use by minors. The site owner does not knowingly permit access by individuals under 18 and assumes no liability for unauthorized use by minors.</p>
     </div>
 
     <div class="detail-section">
       <h4>3. Data Collection &amp; Privacy</h4>
-      <p>This site stores minimal data necessary to operate multiplayer sessions. Player names and game state are temporarily stored in Google Firebase Realtime Database. Your browser's local storage is used solely to remember that you have accepted this disclaimer — no personal profile is created. No email address, payment information, or sensitive personal data is collected. Data stored in Firebase may be retained for a limited period and is subject to Google's Privacy Policy. By using this site you consent to this limited data use.</p>
+      <p>This site collects and stores only minimal data necessary to operate gameplay functionality, including player-provided display names and temporary game session data. This data may be processed and stored through Google Firebase Realtime Database. No accounts are required, and no sensitive personal data (such as email addresses, payment information, or government identifiers) is collected.<br><br>
+      Your browser may store a small local record solely to remember acceptance of these terms. Session data is retained only as long as reasonably necessary for gameplay and may be automatically deleted or overwritten. By using this site, you consent to this limited data collection and processing.</p>
     </div>
 
     <div class="detail-section">
-      <h4>4. No Warranty &amp; Limitation of Liability</h4>
-      <p>This site is provided "as is" and "as available," without warranty of any kind — express or implied — including but not limited to fitness for a particular purpose, uninterrupted availability, or freedom from errors. The site owner shall not be liable for any direct, indirect, incidental, special, or consequential damages arising out of or related to your use (or inability to use) this site, including loss of game data, session disconnections, or software bugs.</p>
+      <h4>4. No Warranty</h4>
+      <p>This site is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied. This includes, but is not limited to, availability or uninterrupted access, accuracy or reliability of gameplay, and freedom from bugs, errors, or technical issues. Use of the site is at your own risk.</p>
     </div>
 
     <div class="detail-section">
-      <h4>5. Intellectual Property</h4>
-      <p>All game code, graphics, and design elements on this site are the property of the site owner. You may not copy, distribute, modify, or create derivative works without explicit written permission. Use of this site grants you a limited, non-exclusive, non-transferable license to play the game for personal, non-commercial purposes only.</p>
+      <h4>5. Limitation of Liability</h4>
+      <p>To the fullest extent permitted by law, the site owner shall not be liable for any damages arising out of or related to your use of, or inability to use, this site. This includes, without limitation: loss of game progress or session data, disconnections or service interruptions, software bugs or unexpected behavior, and any indirect, incidental, or consequential damages.</p>
     </div>
 
     <div class="detail-section">
-      <h4>6. Acceptance of Terms</h4>
-      <p>By checking the box below and clicking "I Agree &amp; Play," you acknowledge that you have read, understood, and agree to be bound by these terms. These terms may be updated at any time; continued use of the site constitutes acceptance of any revised terms. If you do not agree, please close this page.</p>
+      <h4>6. Intellectual Property</h4>
+      <p>All content on this site, including but not limited to code, design, graphics, and gameplay logic, is the property of the site owner unless otherwise stated. You are granted a limited, non-exclusive, non-transferable, revocable license to use the site for personal, non-commercial purposes only. You may not copy, modify, distribute, or create derivative works without prior written permission.</p>
     </div>
 
-    <div class="disc-agree-row">
-      <input type="checkbox" id="disc-check" onchange="document.getElementById('btn-disclaimer-accept').disabled=!this.checked">
-      <label for="disc-check">I confirm I am 18 or older, I have read the above terms, and I agree to them.</label>
+    <div class="detail-section">
+      <h4>7. Changes to Terms</h4>
+      <p>These Terms of Use may be updated at any time without prior notice. Continued use of the site after changes are posted constitutes acceptance of the revised terms.</p>
     </div>
-    <button id="btn-disclaimer-accept" disabled onclick="_disclaimerAccept()">I AGREE &amp; PLAY</button>
+
+    <div class="detail-section">
+      <h4>8. Governing Law</h4>
+      <p>These terms shall be governed by and construed in accordance with the laws of the State of California, United States, without regard to conflict of law principles.</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>9. Acceptance of Terms</h4>
+      <p>By selecting "I Agree &amp; Play," you acknowledge that: you are at least 18 years old; you have read and understood these Terms; and you agree to be legally bound by them. If you do not agree, you must not use this site.</p>
+    </div>
   </div>
 </div>
 
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.5-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.6-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -912,7 +935,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v5.5-MP';
+const VERSION    = 'v5.6-MP';
 
 function _fbInit() {
   if (_fbDb) return;
