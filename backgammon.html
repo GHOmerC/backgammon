@@ -90,7 +90,7 @@
       margin: 20px 0 8px; text-transform: uppercase;
     }
     #disclaimer-box .summary-list {
-      list-style: none; padding: 0; margin: 0 0 20px;
+      list-style: disc; padding-left: 22px; margin: 0 0 20px;
     }
     #disclaimer-box .summary-list li {
       font-size: 12px; color: #c8b070; letter-spacing: 0.5px;
@@ -98,9 +98,7 @@
       border-bottom: 1px solid rgba(201,152,58,0.12);
     }
     #disclaimer-box .summary-list li:last-child { border-bottom: none; }
-    #disclaimer-box .summary-list li span.num {
-      color: #e8c060; font-weight: bold; margin-right: 8px;
-    }
+    #disclaimer-box .summary-list li::marker { color: #e8c060; }
     .disc-divider {
       border: none; border-top: 1px solid rgba(201,152,58,0.3); margin: 22px 0;
     }
@@ -554,7 +552,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.6-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.7-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -935,7 +933,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v5.6-MP';
+const VERSION    = 'v5.7-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -961,6 +959,32 @@ function _mkPlayerKey(name, ip) {
 function _updateRatingDisplay() {
   const el = document.getElementById('rating-display');
   if (el) el.textContent = _levelLabel(_myRating) + '  ·  ' + _myRating;
+}
+
+// Show the declare-victory / wait-longer overlay for the IDLE player.
+// Called both from _listenForState (Firebase signal) and from update()
+// (idle player self-detects expiry when active player's tab is closed/minimised).
+function _showTimeoutOverlay() {
+  const timedOutName = currentPlayer==='white' ? players.white.name : players.black.name;
+  document.getElementById('timeout-msg').textContent =
+    timedOutName + ' hasn\'t moved in 60 seconds.';
+  document.getElementById('timeout-overlay').style.display = 'block';
+  document.getElementById('timeout-declare-btn').onclick = () => {
+    document.getElementById('timeout-overlay').style.display = 'none';
+    _timeoutPending = false;
+    const opp = currentPlayer==='white'?'black':'white';
+    gameScore[opp] += 3;
+    phase='gameover'; statusMsg=(currentPlayer==='white'?'WHITE':'BLACK')+' FORFEITS!';
+    statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(opp);
+    _gameWinner = opp; _gameWinType = 'backgammon'; _updateElo(opp, 3); _saveMatchHistory(opp, 3); _showRematchBtn();
+    pushState('win');
+  };
+  document.getElementById('timeout-wait-btn').onclick = () => {
+    document.getElementById('timeout-overlay').style.display = 'none';
+    _timeoutPending = false;
+    _setTurnTimer(TURN_FRAMES); // reset clock for another 65s
+    pushState(); // notify active player: clock reset, they may roll again
+  };
 }
 
 function _showRematchBtn() {
@@ -1477,27 +1501,7 @@ function _listenForState() {
       // ── Timeout signal — active player ran out of time ────────────
       if (data.timedOut && !_timeoutPending) {
         _timeoutPending = true;
-        // I am the waiting player — show declare victory prompt
-        const timedOutName = currentPlayer==='white' ? players.white.name : players.black.name;
-        document.getElementById('timeout-msg').textContent =
-          timedOutName + ' hasn\'t moved in 60 seconds.';
-        document.getElementById('timeout-overlay').style.display = 'block';
-        document.getElementById('timeout-declare-btn').onclick = () => {
-          document.getElementById('timeout-overlay').style.display = 'none';
-          _timeoutPending = false;
-          const opp = currentPlayer==='white'?'black':'white';
-          gameScore[opp] += 3;
-          phase='gameover'; statusMsg=(currentPlayer==='white'?'WHITE':'BLACK')+' FORFEITS!';
-          statusTimer=99999; playWin(); triggerFireworks(); triggerBillWinAnim(opp);
-          _gameWinner = opp; _gameWinType = 'backgammon'; _updateElo(opp, 3); _saveMatchHistory(opp, 3); _showRematchBtn();
-          pushState('win');
-        };
-        document.getElementById('timeout-wait-btn').onclick = () => {
-          document.getElementById('timeout-overlay').style.display = 'none';
-          _timeoutPending = false;
-          _setTurnTimer(TURN_FRAMES); // reset clock for another 65s
-          pushState(); // notify active player: clock reset, they may roll again
-        };
+        _showTimeoutOverlay(); // I am the waiting player — show declare victory prompt
       }
 
       // ── Sound events ──────────────────────────────────────────────
@@ -3842,8 +3846,13 @@ function update(dt) {
         // Multiplayer — I am the ACTIVE player: freeze my input and signal opponent
         _timeoutPending = true;
         pushState('timeout');
+      } else if (myRole) {
+        // Multiplayer — I am the IDLE player and the clock expired locally.
+        // This fires when the active player's tab is minimised, frozen, or closed —
+        // they never pushed the Firebase 'timeout' signal, so we self-trigger.
+        _timeoutPending = true;
+        _showTimeoutOverlay();
       }
-      // Waiting player: _timeoutPending set only when they receive the Firebase signal
     }
     // Ticking sound in last 20 seconds — only for the active player
     if (isMyTurn() && turnTimer > 0 && turnTimer <= 1200) {
