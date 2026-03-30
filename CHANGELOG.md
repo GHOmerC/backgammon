@@ -1,5 +1,10 @@
 # Backgammon Changelog
 
+## v4.9-MP
+**Fix double opening dice roll**
+- Root cause: `update()` ran the opening roll resolution for *both* players. When White's physics simulation finished for `opening_b_rolling`, White resolved the winner using `openingDice[1]` — which might be 0 (not yet received from Firebase) if Black's state push was still in transit. This caused White to push an incorrect `phase='rolled'` with White as winner, which Black then received and overrode, creating a second visible cycle.
+- Fix: gate `opening_w_rolling` resolution to White only (`!myRole || myRole === 'white'`), and `opening_b_rolling` resolution to Black only (`!myRole || myRole === 'black'`). The remote player just sees the animation; the roller is the only one who determines the outcome and pushes state.
+
 ## v4.8-MP
 **Fix matchmaking stuck — eliminate /pendingMatches/ dependency**
 - Root cause: White was writing to `/pendingMatches/` (a Firebase path not covered by existing rules), causing a silent write failure that left both players stuck searching forever

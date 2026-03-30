@@ -408,7 +408,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.8-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v4.9-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -742,7 +742,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v4.8-MP';
+const VERSION    = 'v4.9-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -3603,7 +3603,8 @@ function update(dt) {
   }
 
   // Opening roll — white's die settles
-  if (phase === 'opening_w_rolling') {
+  // Only White (or singleplayer) resolves and pushes; Black just animates.
+  if (phase === 'opening_w_rolling' && (!myRole || myRole === 'white')) {
     if (updateDicePhysics()) {
       phase = 'opening_b';
       statusMsg = (players.white.name||'White') + ' rolled ' + openingDice[0] + '!';
@@ -3612,7 +3613,8 @@ function update(dt) {
     }
   }
   // Opening roll — black's die settles, resolve winner
-  if (phase === 'opening_b_rolling') {
+  // Only Black (or singleplayer) resolves and pushes; White just animates.
+  if (phase === 'opening_b_rolling' && (!myRole || myRole === 'black')) {
     if (updateDicePhysics()) {
       const wd = openingDice[0], bd = openingDice[1];
       if (wd === bd) {
