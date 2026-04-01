@@ -602,7 +602,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.4-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.5-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -618,10 +618,10 @@
     <div id="lobby-section">
       <button id="find-btn">🔍  FIND A MATCH  (auto-pair by rating)</button>
       <div id="lobby-sep">— or —</div>
-      <button id="create-btn">⬜  CREATE GAME  (play as White)</button>
+      <button id="create-btn">⬜  INVITE A FRIEND  (play as White)</button>
       <div id="lobby-sep2" style="text-align:center;color:#6a4a20;margin:10px 0;font-size:13px;letter-spacing:3px;">— or —</div>
       <input type="text" id="join-code" placeholder="ROOM CODE" maxlength="4">
-      <button id="join-btn">⬛  JOIN GAME  (play as Black)</button>
+      <button id="join-btn">⬛  INVITE A FRIEND  (play as Black)</button>
     </div>
     <div id="waiting-room">
       <div class="wlabel">SHARE THIS CODE WITH YOUR OPPONENT</div>
@@ -1008,7 +1008,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v6.4-MP';
+const VERSION    = 'v6.5-MP';
 
 function _fbInit() {
   if (_fbDb) return;
