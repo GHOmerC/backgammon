@@ -58,11 +58,7 @@
     }
     #rotate-msg .icon { font-size: 56px; }
     #rotate-msg p { font-size: 16px; letter-spacing: 2px; line-height: 1.6; color: #b8a070; }
-    @media (orientation: portrait) and (max-width: 768px) {
-      #rotate-msg { display: flex; }
-      /* Hide everything else while in portrait on a small screen */
-      #setup-overlay, canvas, #subtitle { visibility: hidden; }
-    }
+    /* Portrait warning shown programmatically after lobby button press */
     /* ── Disclaimer overlay ── */
     #disclaimer-overlay {
       position: fixed; top:0; left:0; right:0; bottom:0;
@@ -552,7 +548,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v5.9-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.0-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -940,7 +936,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v5.9-MP';
+const VERSION    = 'v6.0-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1368,6 +1364,8 @@ async function _registerPlayer(name) {
 
 let _loopStarted = false;
 function _launchGame() {
+  // Auto-hide mobile browser URL bar
+  setTimeout(() => { try { window.scrollTo(0, 1); } catch(e) {} }, 300);
   _hideRematchBtn();
   _leftBase = document.getElementById('left-base').checked;
   document.getElementById('setup-overlay').style.display = 'none';
@@ -1665,7 +1663,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  document.getElementById('create-btn').addEventListener('click', () => _doCreateGame());
+  document.getElementById('create-btn').addEventListener('click', () => {
+    if (_isMobilePortrait()) { _showRotateWarning(_doCreateGame); return; }
+    _doCreateGame();
+  });
   async function _doCreateGame() {
     const name = document.getElementById('my-name').value.trim() || 'White';
     const flag = document.getElementById('my-country').value;
@@ -1699,7 +1700,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   } // end _doCreateGame
 
-  document.getElementById('join-btn').addEventListener('click', () => _doJoinGame());
+  document.getElementById('join-btn').addEventListener('click', () => {
+    if (_isMobilePortrait()) { _showRotateWarning(_doJoinGame); return; }
+    _doJoinGame();
+  });
   async function _doJoinGame() {
     const name = document.getElementById('my-name').value.trim() || 'Black';
     const flag = document.getElementById('my-country').value;
@@ -1727,7 +1731,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('join-btn').click(); }
   });
 
-  document.getElementById('find-btn').addEventListener('click', () => _doFindMatch());
+  document.getElementById('find-btn').addEventListener('click', () => {
+    if (_isMobilePortrait()) { _showRotateWarning(_doFindMatch); return; }
+    _doFindMatch();
+  });
   async function _doFindMatch() {
     const name = document.getElementById('my-name').value.trim() || 'Player';
     const flag = document.getElementById('my-country').value;
@@ -1739,6 +1746,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searching-room').style.display = 'block';
     await _findMatch(name, flag);
   }
+
+  // Mobile portrait warning: shown only when user presses a game button
+  function _isMobilePortrait() {
+    return window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+  }
+  function _showRotateWarning(thenFn) {
+    const msg = document.getElementById('rotate-msg');
+    msg.style.display = 'flex';
+    document.getElementById('setup-overlay').style.visibility = 'hidden';
+    function _onOrient() {
+      if (!_isMobilePortrait()) {
+        msg.style.display = 'none';
+        document.getElementById('setup-overlay').style.visibility = '';
+        window.removeEventListener('resize', _onOrient);
+        if (thenFn) thenFn();
+      }
+    }
+    window.addEventListener('resize', _onOrient);
+  }
+  // Hide portrait overlay when device rotates back to landscape
+  window.addEventListener('resize', () => {
+    if (!_isMobilePortrait()) {
+      document.getElementById('rotate-msg').style.display = 'none';
+      document.getElementById('setup-overlay').style.visibility = '';
+    }
+  });
 
   document.getElementById('cancel-find-btn').addEventListener('click', () => {
     _cancelMatchSearch();
@@ -3121,10 +3154,16 @@ function billTrayPos() {
 
 function drawDollarBill() {
   if (off.white===0 && off.black===0) return;
-  if (phase==='gameover' && billSafeAnim && !billSafeAnim.done) return; // hide tray bill during win anim
+  if (phase==='gameover' && billSafeAnim && !billSafeAnim.done) return;
+  if (!_victoryImg.complete || _victoryImg.naturalWidth === 0) return;
   const pos = billTrayPos();
-  const billW = BEAR_W-10, billH = 27;
-  drawBillGraphic(pos.x, pos.y - billH/2, billW, billH, 0.88);
+  const imgW = BEAR_W - 10;
+  const imgH = Math.round(imgW * _victoryImg.naturalHeight / _victoryImg.naturalWidth);
+  ctx.save();
+  ctx.globalAlpha = 0.88;
+  ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 4;
+  ctx.drawImage(_victoryImg, pos.x, pos.y - imgH/2, imgW, imgH);
+  ctx.restore();
 }
 
 // ── Safe box (win animation) ───────────────────────────────────
