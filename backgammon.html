@@ -267,13 +267,51 @@
     }
     #accept-btn  { background: linear-gradient(135deg, #1a6a1a, #3aaa3a); color: #e8ffe8; }
     #decline-btn { background: linear-gradient(135deg, #6a1a1a, #aa3a3a); color: #ffe8e8; }
-    #leaderboard-btn {
-      display: block; width: 100%; padding: 9px; margin-bottom: 8px;
+    #lobby-bottom-row {
+      display: flex; gap: 8px; margin-bottom: 8px;
+    }
+    #who-we-are-btn, #disclaimer-lobby-btn {
+      flex: 1; padding: 9px 6px;
       background: transparent; border: 1px solid #4a3a18; border-radius: 8px;
       color: #9a8040; font-family: 'Courier New', monospace; font-size: 11px;
       letter-spacing: 2px; cursor: pointer; touch-action: manipulation;
     }
-    #leaderboard-btn:hover { border-color: #c9983a; color: #c9983a; }
+    #who-we-are-btn:hover, #disclaimer-lobby-btn:hover { border-color: #c9983a; color: #c9983a; }
+    /* ── Who We Are overlay ── */
+    #who-overlay {
+      position: fixed; top:0; left:0; right:0; bottom:0;
+      background: rgba(5,4,2,0.98);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; font-family: 'Courier New', monospace;
+      padding: 16px;
+    }
+    #who-box {
+      background: #0e0a04; border: 2px solid #c9983a;
+      border-radius: 14px; padding: 30px 36px 28px;
+      width: min(520px, 100%); color: #f0ddb0;
+      max-height: 90vh; overflow-y: auto;
+    }
+    #who-box h2 {
+      text-align: center; color: #e8c060; font-size: 20px;
+      letter-spacing: 5px; margin-bottom: 20px;
+    }
+    #who-box ul {
+      list-style: disc; padding-left: 22px; margin: 0 0 24px;
+    }
+    #who-box ul li {
+      font-size: 13px; color: #c8b070; letter-spacing: 0.5px;
+      line-height: 1.8; padding: 3px 0;
+    }
+    #who-box a { color: #e8c060; text-decoration: none; }
+    #who-box a:hover { text-decoration: underline; }
+    #close-who-btn {
+      display: block; margin: 0 auto;
+      padding: 9px 32px;
+      background: transparent; border: 1px solid #c9983a; border-radius: 8px;
+      color: #e8c060; font-family: 'Courier New', monospace; font-size: 12px;
+      letter-spacing: 3px; cursor: pointer;
+    }
+    #close-who-btn:hover { background: rgba(201,152,58,0.15); }
     #leaderboard-room { display: none; padding-top: 4px; }
     #leaderboard-list { list-style: none; padding: 0; margin: 0 0 12px 0; }
     #leaderboard-list li { font-size: 11px; letter-spacing: 1px; color: #d0c080;
@@ -556,7 +594,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.1-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.2-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -597,7 +635,10 @@
       <button id="close-lb-btn">CLOSE</button>
     </div>
     <div id="mp-error"></div>
-    <button id="leaderboard-btn">🏆  LEADERBOARD</button>
+    <div id="lobby-bottom-row">
+      <button id="who-we-are-btn">ℹ  WHO WE ARE</button>
+      <button id="disclaimer-lobby-btn">📋  DISCLAIMER</button>
+    </div>
   </div>
 </div>
 <canvas id="c"></canvas>
@@ -775,6 +816,20 @@
   </div><!-- /vault-positioner -->
 </div><!-- /vault-overlay -->
 
+<div id="who-overlay" style="display:none">
+  <div id="who-box">
+    <h2>WHO WE ARE</h2>
+    <ul>
+      <li>A free online backgammon game</li>
+      <li>No login required, no ads</li>
+      <li>Scoring system based on your name and IP address</li>
+      <li>Developed in California</li>
+      <li>Contact: <a href="mailto:Backgammon.California@gmail.com">Backgammon.California@gmail.com</a></li>
+    </ul>
+    <button id="close-who-btn" onclick="document.getElementById('who-overlay').style.display='none'">CLOSE</button>
+  </div>
+</div>
+
 <div id="subtitle">White vs Black</div>
 <button id="roll-btn">🎲  ROLL DICE</button>
 <div id="rotate-msg">
@@ -945,7 +1000,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v6.1-MP';
+const VERSION    = 'v6.2-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1128,7 +1183,6 @@ function _cleanupStaleRooms() {
 
 // ── Leaderboard ───────────────────────────────────────────────
 async function _showLeaderboard() {
-  document.getElementById('leaderboard-btn').style.display = 'none';
   document.getElementById('leaderboard-room').style.display = 'block';
   const list = document.getElementById('leaderboard-list');
   list.innerHTML = '<li style="color:#888;justify-content:center;">Loading...</li>';
@@ -1779,15 +1833,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('rematch-btn').addEventListener('click', () => { _doRematch(); });
 
-  document.getElementById('leaderboard-btn').addEventListener('click', () => {
-    _fbInit();
-    document.getElementById('leaderboard-room').style.display = 'block';
-    document.getElementById('leaderboard-btn').style.display = 'none';
-    _showLeaderboard();
+  document.getElementById('who-we-are-btn').addEventListener('click', () => {
+    document.getElementById('who-overlay').style.display = 'flex';
   });
-  document.getElementById('close-lb-btn').addEventListener('click', () => {
-    document.getElementById('leaderboard-room').style.display = 'none';
-    document.getElementById('leaderboard-btn').style.display = 'block';
+  document.getElementById('disclaimer-lobby-btn').addEventListener('click', () => {
+    // Reset checkbox so user must re-tick, then show overlay (read-only view)
+    const chk = document.getElementById('disc-check');
+    if (chk) { chk.checked = false; document.getElementById('btn-disclaimer-accept').disabled = true; }
+    document.getElementById('disclaimer-overlay').style.display = 'flex';
   });
 });
 
