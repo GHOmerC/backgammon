@@ -3544,8 +3544,8 @@ function triggerBillWinAnim(winner) {
   const pos = billTrayPos();
   const gcx = IX + PLAY_W / 2, gcy = IY + IH / 2;
   // Position vault near winner's name row (same as old canvas safe)
-  const safeX = gcx + 70;
-  const safeY = (winner === 'white') ? gcy + 18 : gcy + 54;
+  const safeX = gcx + 59;   // centre of [names | safe | scores] column
+  const safeY = gcy + 36;  // vertically centred between the two name rows
   billSafeAnim = {
     fromX: pos.x + (BEAR_W-10)/2, fromY: pos.y,
     safeX, safeY, winner,
