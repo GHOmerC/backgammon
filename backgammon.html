@@ -635,7 +635,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.6-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.7-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -1047,7 +1047,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v7.6-MP';
+const VERSION    = 'v7.7-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1748,6 +1748,13 @@ function _listenForState() {
 
       // ── Dice display ──────────────────────────────────────────────
       const isRollingPhase = phase === 'rolling' || phase === 'opening_w_rolling' || phase === 'opening_b_rolling';
+      if (isRollingPhase && !data.diceInitState && dicePhysics.length === 0 && dice.length > 0) {
+        // diceInitState missing (Firebase serialized null) — fall back to local physics init
+        // so the die is always visible even if the init state didn't arrive
+        if (phase === 'opening_w_rolling') initDicePhysics(dice[0], 0, true);
+        else if (phase === 'opening_b_rolling') { initDicePhysics(dice[0], 0, true); addDieToPhysics(dice[1] || dice[0]); }
+        else initDicePhysics(dice[0], dice[1] || dice[0]);
+      }
       if (isRollingPhase && data.diceInitState) {
         // Mirror the rolling animation — reconstruct physics from sender's initial state
         const leftMinX  = (_leftBase ? bearX()+BEAR_W : IX) + DIE_SZ/2 + 2;
