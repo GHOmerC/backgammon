@@ -602,7 +602,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.6-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.7-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -655,7 +655,7 @@
 </div>
 <div id="timeout-overlay">
   <p id="timeout-msg">Opponent hasn't moved in 60 seconds.</p>
-  <button id="timeout-declare-btn">⚑  DECLARE VICTORY  (+3 pts)</button><br>
+  <button id="timeout-declare-btn">⚑  DECLARE VICTORY</button><br>
   <button id="timeout-wait-btn" style="margin-top:8px;">WAIT A BIT LONGER</button>
 </div>
 
@@ -1008,7 +1008,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v6.6-MP';
+const VERSION    = 'v6.7-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -3912,17 +3912,21 @@ function drawBoard() {
     const _wNameX = players.white.flag ? gcx-153 : gcx-200;
     ctx.font='bold 16px Courier New'; ctx.textAlign='left';
     ctx.fillStyle=C.wBase; ctx.fillText(players.white.name.substring(0,9)+' (white)', _wNameX, gcy+18);
-    ctx.font='bold 22px Courier New';
-    ctx.fillText(gameScore.white, gcx+148, gcy+18);
+    ctx.font = (myRole && !_isRankedGame) ? 'bold 14px Courier New' : 'bold 22px Courier New';
+    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='white' ? 'Win' : 'Loss') : gameScore.white, gcx+148, gcy+18);
     // Black player row
     if (players.black.flag) drawCanvasFlag(players.black.flag, gcx-200, gcy+38, 38, 25);
     const _bNameX = players.black.flag ? gcx-153 : gcx-200;
     ctx.font='bold 16px Courier New'; ctx.textAlign='left';
     ctx.fillStyle='#c8ccff'; ctx.fillText(players.black.name.substring(0,9)+' (black)', _bNameX, gcy+54);
-    ctx.font='bold 22px Courier New';
-    ctx.fillText(gameScore.black, gcx+148, gcy+54);
+    ctx.font = (myRole && !_isRankedGame) ? 'bold 14px Courier New' : 'bold 22px Courier New';
+    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='black' ? 'Win' : 'Loss') : gameScore.black, gcx+148, gcy+54);
     ctx.font='11px Courier New'; ctx.fillStyle=C.labelDim; ctx.textAlign='center';
     ctx.fillText('Press  R  to play again',gcx,gcy+80);
+    if (myRole && !_isRankedGame && !statusMsg.includes('FORFEIT')) {
+      ctx.font='10px Courier New'; ctx.fillStyle='rgba(201,152,58,0.65)';
+      ctx.fillText('Friends game \u2014 doesn\u2019t affect your score', gcx, gcy+96);
+    }
   }
 
   ctx.fillStyle=C.labelDim; ctx.font='bold 12px Courier New'; ctx.textAlign='left';
