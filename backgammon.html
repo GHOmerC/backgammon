@@ -354,6 +354,25 @@
       margin-left: 12px;
     }
     #lobby-btn:hover { background: rgba(201,152,58,0.15); }
+    /* ── Early-win overlay ── */
+    #early-win-overlay {
+      position: fixed; top: 38%; left: 50%; transform: translate(-50%, -50%);
+      background: #0e0a04; border: 2px solid #c9983a; border-radius: 12px;
+      padding: 20px 26px; z-index: 120; font-family: 'Courier New', monospace;
+      text-align: center; color: #f0ddb0; width: 290px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.75);
+    }
+    #early-win-msg { font-size: 12px; letter-spacing: 1px; color: #b8a070; margin-bottom: 14px; line-height: 1.55; }
+    #early-win-btn {
+      display: block; width: 100%; padding: 10px;
+      background: linear-gradient(135deg, #1a4a2a, #3aaa5a);
+      border: none; border-radius: 8px; color: #e0ffe8;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      font-weight: bold; letter-spacing: 2px; cursor: pointer;
+    }
+    #early-win-btn:hover { background: linear-gradient(135deg, #1e5a34, #4aba6a); }
+    #early-win-btn:disabled { background: #1a3a20; color: #5a7a5a; cursor: not-allowed; }
+    #early-win-status { font-size: 10px; color: #7a9070; margin-top: 8px; letter-spacing: 1px; min-height: 14px; }
     #timeout-declare-btn, #timeout-wait-btn {
       display: inline-block; padding: 10px 20px; margin: 4px;
       border-radius: 8px; font-family: 'Courier New', monospace;
@@ -606,7 +625,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.8-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v6.9-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -656,6 +675,11 @@
 <canvas id="c"></canvas>
 <div id="rematch-overlay">
   <button id="rematch-btn">⚔  REMATCH</button><button id="lobby-btn">⌂  LOBBY</button>
+</div>
+<div id="early-win-overlay" style="display:none">
+  <p id="early-win-msg"></p>
+  <button id="early-win-btn"></button>
+  <p id="early-win-status"></p>
 </div>
 <div id="timeout-overlay">
   <p id="timeout-msg">Opponent hasn't moved in 60 seconds.</p>
@@ -1012,7 +1036,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v6.8-MP';
+const VERSION    = 'v6.9-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1072,6 +1096,105 @@ function _showTimeoutOverlay() {
 function _showRematchBtn() {
   if (!myRole) return; // singleplayer — no rematch btn
   setTimeout(() => { document.getElementById('rematch-overlay').style.display = 'block'; }, 2000);
+}
+
+// ── Early-win simulation ──────────────────────────────────────────────────────
+function _allMenHome(color) {
+  if (bar[color] > 0) return false;
+  const hs = color === 'white' ? 1 : 19, he = color === 'white' ? 6 : 24;
+  for (let p = 1; p <= 24; p++) {
+    if (p >= hs && p <= he) continue;
+    if (points[p].color === color && points[p].count > 0) return false;
+  }
+  return true;
+}
+function _getHomeMen(color) {
+  const men = [];
+  if (color === 'white') {
+    for (let p = 1; p <= 6; p++)
+      if (points[p].color === 'white')
+        for (let i = 0; i < points[p].count; i++) men.push(p);
+  } else {
+    for (let p = 19; p <= 24; p++)
+      if (points[p].color === 'black')
+        for (let i = 0; i < points[p].count; i++) men.push(25 - p);
+  }
+  return men;
+}
+function _simPlayDice(men, dice) {
+  men = men.slice().sort((a, b) => b - a);
+  for (const d of dice) {
+    if (!men.length) break;
+    let idx = -1;
+    for (let i = 0; i < men.length; i++) { if (men[i] <= d) { idx = i; break; } }
+    if (idx >= 0) { men.splice(idx, 1); }
+    else { men[0] = Math.max(1, men[0] - d); men.sort((a, b) => b - a); }
+  }
+  return men;
+}
+function _simulate1PointWin(paColor) {
+  // PA gets worst dice (2,1); PB gets best dice (6,6 = 4 moves). If PA still wins: certain victory.
+  const pbColor = paColor === 'white' ? 'black' : 'white';
+  let paMen = _getHomeMen(paColor), pbMen = _getHomeMen(pbColor);
+  if (!paMen.length) return false;
+  for (let t = 0; t < 60; t++) {
+    paMen = _simPlayDice(paMen, [2, 1]);
+    if (!paMen.length) return true;
+    pbMen = _simPlayDice(pbMen, [6, 6, 6, 6]);
+    if (!pbMen.length) return false;
+  }
+  return false;
+}
+function _refreshEarlyWinOverlay() {
+  const ov = document.getElementById('early-win-overlay');
+  if (!myRole || phase !== 'idle' || _ewCompleted) { ov.style.display = 'none'; return; }
+  if (!_allMenHome('white') || !_allMenHome('black')) { ov.style.display = 'none'; return; }
+  if (off.white >= 15 || off.black >= 15) { ov.style.display = 'none'; return; }
+  if (!_simulate1PointWin(currentPlayer)) { ov.style.display = 'none'; return; }
+  _ewPA = currentPlayer;
+  const iAmPA = myRole === currentPlayer;
+  const paName = currentPlayer === 'white' ? players.white.name : players.black.name;
+  ov.style.display = 'block';
+  document.getElementById('early-win-msg').textContent = iAmPA
+    ? 'You are certain to win — even with the worst dice!'
+    : paName + ' is certain to win this round.';
+  const btn = document.getElementById('early-win-btn');
+  btn.textContent = iAmPA ? '\uD83E\uDD1D  Agree to win by 1 point' : '\uD83E\uDD1D  Agree to lose 1 point';
+  btn.disabled = _ewMyAgreed;
+  document.getElementById('early-win-status').textContent = _ewMyAgreed ? 'Waiting for opponent...' : '';
+}
+function _onEarlyWinAgree() {
+  if (!myRole || !_fbRoom || _ewMyAgreed || _ewCompleted || !_ewPA) return;
+  _ewMyAgreed = true;
+  const btn = document.getElementById('early-win-btn');
+  btn.disabled = true;
+  btn.textContent = '\u2713  Waiting for opponent...';
+  document.getElementById('early-win-status').textContent = '';
+  _fbRoom.child('earlyWin/' + myRole).set(true);
+  if (myRole === _ewPA) {
+    // I am the guaranteed winner — watch for opponent to agree, then trigger win
+    const oppRole = myRole === 'white' ? 'black' : 'white';
+    _fbRoom.child('earlyWin/' + oppRole).on('value', function ewW(snap) {
+      if (!snap.val()) return;
+      _fbRoom.child('earlyWin/' + oppRole).off('value', ewW);
+      _triggerEarlyWin();
+    });
+  }
+  // If I am PB (the loser), PA's listener will detect my signal and drive the win
+}
+function _triggerEarlyWin() {
+  if (_ewCompleted) return;
+  _ewCompleted = true;
+  if (_fbRoom) _fbRoom.child('earlyWin').remove();
+  document.getElementById('early-win-overlay').style.display = 'none';
+  const winner = _ewPA;
+  gameScore[winner] += 1;
+  statusMsg = (winner === 'white' ? 'WHITE' : 'BLACK') + ' WINS!';
+  phase = 'gameover'; statusTimer = 99999;
+  playWin(); triggerFireworks(); triggerBillWinAnim(winner); _clearTurnTimer();
+  _gameWinner = winner; _gameWinType = 'win';
+  _updateElo(winner, 1); _saveMatchHistory(winner, 1); _showRematchBtn();
+  pushState('win');
 }
 
 function _hideRematchBtn() {
@@ -1879,6 +2002,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('rematch-btn').addEventListener('click', () => { _doRematch(); });
   document.getElementById('lobby-btn').addEventListener('click', () => { location.reload(); });
+  document.getElementById('early-win-btn').addEventListener('click', () => { _onEarlyWinAgree(); });
 
   document.getElementById('who-we-are-btn').addEventListener('click', () => {
     document.getElementById('who-overlay').style.display = 'flex';
@@ -1960,6 +2084,10 @@ function _clearTurnTimer() { turnTimer = -1; _clockDeadlineMs = -1; }
 let _doublesFlashT = 0; // countdown frames for playable-doubles glow
 let _gameWinner   = null; // 'white'|'black' — set on win, read by remote for safe animation
 let _gameWinType  = null; // 'win'|'gammon'|'backgammon' — set alongside _gameWinner
+let _ewChecked    = false; // early-win: prevent re-running simulation every frame
+let _ewPA         = null;  // early-win: color guaranteed to win
+let _ewMyAgreed   = false; // early-win: this client pressed Agree
+let _ewCompleted  = false; // early-win: win triggered, no double-fire
 let _pendingSound = null; // sound event to include in the next pushState call
 let _pendingMoveAnim = null; // {fromPt, toPt, color} — set in executeMove, consumed by pushState
 let _leftBase = false;     // local preference: home board on left side (not synced to opponent)
@@ -4039,6 +4167,17 @@ function update(dt) {
       }
       // Remote (visualOnly): board state already applied from Firebase — animation only
     }
+  }
+
+  // Early-win check: run simulation once when entering idle phase, reset when leaving
+  if (phase === 'idle' && !_ewChecked && !_ewCompleted) {
+    _ewChecked = true;
+    _refreshEarlyWinOverlay();
+  }
+  if (phase !== 'idle' && _ewChecked && !_ewCompleted) {
+    _ewChecked = false; _ewMyAgreed = false; _ewPA = null;
+    if (_fbRoom) _fbRoom.child('earlyWin').remove();
+    document.getElementById('early-win-overlay').style.display = 'none';
   }
 
   // Auto-skip if bar entries are fully blocked (all 6 entry points covered by opponent)
