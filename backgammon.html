@@ -625,7 +625,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.0-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.1-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -1036,7 +1036,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v7.0-MP';
+const VERSION    = 'v7.1-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1147,13 +1147,29 @@ function _simulate1PointWin(paColor) {
 }
 function _refreshEarlyWinOverlay() {
   const ov = document.getElementById('early-win-overlay');
-  if (!myRole || phase !== 'idle' || _ewCompleted) { ov.style.display = 'none'; return; }
+  // Hide immediately if not in idle phase — catches dice-throw and move phases
+  if (!myRole || phase !== 'idle' || _ewCompleted) {
+    if (ov.style.display !== 'none') {
+      ov.style.display = 'none';
+      // Reset agree state when leaving idle so next turn starts fresh
+      _ewMyAgreed = false; _ewPA = null;
+    }
+    return;
+  }
+  // Hide if not both players fully home yet
   if (!_allMenHome('white') || !_allMenHome('black')) { ov.style.display = 'none'; return; }
   if (off.white >= 15 || off.black >= 15) { ov.style.display = 'none'; return; }
-  if (!_simulate1PointWin(currentPlayer)) { ov.style.display = 'none'; return; }
-  _ewPA = currentPlayer;
-  const iAmPA = myRole === currentPlayer;
-  const paName = currentPlayer === 'white' ? players.white.name : players.black.name;
+  // Hide (and reset) if the certain-winner changed (new turn)
+  const simWinner = _simulate1PointWin(currentPlayer) ? currentPlayer : null;
+  if (!simWinner) { ov.style.display = 'none'; _ewPA = null; _ewMyAgreed = false; return; }
+  // New turn: reset agree state
+  if (_ewPA !== simWinner) {
+    _ewPA = simWinner;
+    _ewMyAgreed = false;
+    if (_fbRoom) _fbRoom.child('earlyWin').remove();
+  }
+  const iAmPA = myRole === _ewPA;
+  const paName = _ewPA === 'white' ? players.white.name : players.black.name;
   ov.style.display = 'block';
   document.getElementById('early-win-msg').textContent = iAmPA
     ? 'You are certain to win — even with the worst dice!'
@@ -2098,8 +2114,7 @@ function _clearTurnTimer() { turnTimer = -1; _clockDeadlineMs = -1; }
 let _doublesFlashT = 0; // countdown frames for playable-doubles glow
 let _gameWinner   = null; // 'white'|'black' — set on win, read by remote for safe animation
 let _gameWinType  = null; // 'win'|'gammon'|'backgammon' — set alongside _gameWinner
-let _ewChecked    = false; // early-win: prevent re-running simulation every frame
-let _ewPA         = null;  // early-win: color guaranteed to win
+let _ewPA         = null;  // early-win: color guaranteed to win ('white'|'black'|null)
 let _ewMyAgreed   = false; // early-win: this client pressed Agree
 let _ewCompleted  = false; // early-win: win triggered, no double-fire
 let _pendingSound = null; // sound event to include in the next pushState call
@@ -4183,16 +4198,8 @@ function update(dt) {
     }
   }
 
-  // Early-win check: run simulation once when entering idle phase, reset when leaving
-  if (phase === 'idle' && !_ewChecked && !_ewCompleted) {
-    _ewChecked = true;
-    _refreshEarlyWinOverlay();
-  }
-  if (phase !== 'idle' && _ewChecked && !_ewCompleted) {
-    _ewChecked = false; _ewMyAgreed = false; _ewPA = null;
-    if (_fbRoom) _fbRoom.child('earlyWin').remove();
-    document.getElementById('early-win-overlay').style.display = 'none';
-  }
+  // Early-win: evaluate every frame — overlay shows only in idle, hides immediately otherwise
+  if (!_ewCompleted) _refreshEarlyWinOverlay();
 
   // Auto-skip if bar entries are fully blocked (all 6 entry points covered by opponent)
   if (phase === 'idle' && skipTimer === 0 && allBarEntriesBlocked()) {
