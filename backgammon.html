@@ -635,7 +635,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.5-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.6-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -1047,7 +1047,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v7.5-MP';
+const VERSION    = 'v7.6-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -2646,9 +2646,9 @@ function drawDicePhysics() {
       } else {
         const rem = [...movesLeft];
         const idxR = rem.indexOf(die.value);
-        marks = (idxR === -1) ? 2 : 0;
+        marks = (idxR === -1) ? 1 : 0; // one slash per move used
       }
-      drawDie(die.x, die.y, die.value, marks === 2, marks);
+      drawDie(die.x, die.y, die.value, isDoubles && marks === 2, marks);
     }
   }
 
