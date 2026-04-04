@@ -635,7 +635,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v7.9-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v8.0-MP</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
       <label class="wlabel">YOUR NAME</label>
@@ -1048,7 +1048,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v7.9-MP';
+const VERSION    = 'v8.0-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1702,6 +1702,13 @@ function _listenForState() {
       _rematchPending = false;
       initBoard(); // fresh board; _listenForState continues applying White's state below
     }
+    // Guard: Black's tie-reset push (phase='opening') can arrive at White AFTER White has
+    // already rolled their die. Applying it would clear dicePhysics mid-roll.
+    // Only skip it if White's die is already in the air (opening_w_rolling).
+    // In opening_b / opening_b_rolling, the reset IS legitimate — Black tied again.
+    if (myRole === 'white' && data.phase === 'opening' && phase === 'opening_w_rolling') {
+      return;
+    }
     _applyingRemote = true;
     try {
       // ── Checker animation: calculate visual positions BEFORE state is applied ──
@@ -1844,6 +1851,13 @@ function _listenForState() {
     // Only the player who did NOT detect the tie needs this (the resolver already set statusMsg)
     if (phase === 'opening_b_rolling') {
       statusMsg = 'TIE  —  Roll Again!'; statusTimer = 200;
+      // White's screen: clear dice immediately — no need to hold for Black's 1.5s timeout.
+      // The existing guard in _listenForState will block Black's delayed phase='opening' push
+      // if White has already started rolling by then.
+      if (myRole === 'white') {
+        dicePhysics = []; dice = []; movesLeft = []; openingDice = [];
+        phase = 'opening';
+      }
     }
   });
 
@@ -2176,6 +2190,7 @@ function barCy(playerColor, i) {
   return IY + IH * 0.25 + i * CHK_GAP;
 }
 let openingDice = []; // [whiteDie, blackDie] — used during opening roll phase
+let _tieHandled = false; // guard: prevents 90 duplicate setTimeout calls while dice sit stopped after a tie
 
 // Fireworks
 let fireworks = [], fireworkBurstQueue = [];
@@ -2745,7 +2760,7 @@ function initBoard() {
   bar.white=0; bar.black=0; off.white=0; off.black=0;
   currentPlayer='white'; dice=[]; movesLeft=[];
   selectedPoint=null; highlights=[]; combinedHighlights=[]; statusMsg=''; statusTimer=0; skipTimer=0;
-  dicePhysics=[]; checkerAnim=null; blotAnim=null; openingDice=[];
+  dicePhysics=[]; checkerAnim=null; blotAnim=null; openingDice=[]; _tieHandled=false;
   turnTimer=-1; _clockDeadlineMs=-1; fireworks=[]; fireworkBurstQueue=[]; billSafeAnim=null;
 }
 
@@ -4325,15 +4340,17 @@ function update(dt) {
   // Opening roll — black's die settles, resolve winner
   // Only Black (or singleplayer) resolves and pushes; White just animates.
   if (phase === 'opening_b_rolling' && (!myRole || myRole === 'black')) {
-    if (updateDicePhysics()) {
+    if (!_tieHandled && updateDicePhysics()) {
       const wd = openingDice[0], bd = openingDice[1];
       if (wd === bd) {
+        _tieHandled = true; // block every subsequent frame from queuing another setTimeout
         statusMsg = 'TIE  —  Roll Again!'; statusTimer = 200;
         // Signal the remote player immediately so they see the TIE message
         // while both dice are still visible on their screen
         if (_fbRoom) _fbRoom.child('tieSignal').set(Date.now());
         // Hold the dice visible for 1.5s so both players can see the matched numbers
         setTimeout(() => {
+          _tieHandled = false;
           if (_fbRoom) _fbRoom.child('tieSignal').remove();
           dicePhysics = []; dice = []; movesLeft = [];
           phase = 'opening';
