@@ -709,7 +709,7 @@
 <div id="early-win-overlay" style="display:none">
   <p id="early-win-msg"></p>
   <button id="early-win-btn"></button>
-  <button id="early-play-on-btn">🎲  I want to play until the end</button>
+  <button id="early-play-on-btn">🎲  I want to continue playing</button>
   <p id="early-win-status"></p>
 </div>
 <div id="timeout-overlay">
@@ -1195,8 +1195,10 @@ function _refreshEarlyWinOverlay() {
     }
     return;
   }
-  // Both players must have all remaining men in home board
+  // Both players must have all remaining men in home board AND each must have borne off at least 1
+  // (prevents early-win appearing before doubles are possible — e.g. opponent could roll doubles)
   if (!_allMenHome('white') || !_allMenHome('black')) { ov.style.display = 'none'; return; }
+  if (off.white < 1 || off.black < 1) { ov.style.display = 'none'; return; }
   if (off.white >= 15 || off.black >= 15) { ov.style.display = 'none'; return; }
   const simWinner = _getCertainWinner();
   if (!simWinner) { ov.style.display = 'none'; _ewPA = null; _ewMyAgreed = false; return; }
@@ -1881,6 +1883,14 @@ function _listenForState() {
     }
   });
 
+  // earlyWin node removed = opponent pressed "I want to continue playing" — reset our overlay too
+  _fbRoom.child('earlyWin').on('value', snap => {
+    if (!snap.val() && _ewPA && !_ewCompleted) {
+      _ewMyAgreed = false; _ewPA = null;
+      document.getElementById('early-win-overlay').style.display = 'none';
+    }
+  });
+
   // Opponent presence: 8-second grace period before declaring disconnect,
   // in case it was a brief network glitch and they reconnect.
   const oppRole = myRole === 'white' ? 'black' : 'white';
@@ -2126,7 +2136,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (_fbRoom) _fbRoom.child('earlyWin').remove();
     document.getElementById('early-win-overlay').style.display = 'none';
-    _ewMyAgreed = false; _ewPA = null;
+    _ewMyAgreed = false; _ewPA = null; _ewCompleted = false;
+    pushState(); // tell opponent: play-on was chosen, close their overlay too
   });
 
   document.getElementById('who-we-are-btn').addEventListener('click', async () => {
@@ -4248,25 +4259,38 @@ function drawBoard() {
   }
   ctx.restore();
   // ── Player flag + name + rating in top/bottom border strips ──
+  // Layout: [name (left-aligned from BX+8)] ... [flag] [level · rating] (right-aligned)
   const _brdFW=26, _brdFH=17;
   const _brdRight = BX + BW - 4;
-  const _brdNameX = _brdRight - _brdFW - 4;
+  const _brdNameL = BX + 8; // name starts at left edge of border
+  // Rating text sits to the right of the flag
+  const _brdRatingX = _brdRight + 2;
   // Black — top border
-  ctx.fillStyle='#a8aae8'; ctx.font='bold 12px Courier New'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  ctx.fillText(players.black.name.substring(0,7), _brdNameX - 2, BY+5);
-  if (myRole && players.black.rating) {
-    ctx.font='9px Courier New'; ctx.fillStyle='rgba(168,170,232,0.85)';
-    ctx.fillText(_levelLabel(players.black.rating) + '  ' + players.black.rating, _brdNameX - 2, BY+15);
-  }
+  ctx.fillStyle='#a8aae8'; ctx.font='bold 14px Courier New'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(players.black.name.substring(0,12), _brdNameL, BY+10);
   drawCanvasFlag(players.black.flag, _brdRight - _brdFW, BY+1, _brdFW, _brdFH);
-  // White — bottom border
-  ctx.fillStyle='#d0b880'; ctx.font='bold 12px Courier New'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  ctx.fillText(players.white.name.substring(0,7), _brdNameX - 2, IY+IH+5);
-  if (myRole && players.white.rating) {
-    ctx.font='9px Courier New'; ctx.fillStyle='rgba(208,184,128,0.85)';
-    ctx.fillText(_levelLabel(players.white.rating) + '  ' + players.white.rating, _brdNameX - 2, IY+IH+15);
+  if (myRole && players.black.rating) {
+    ctx.save();
+    ctx.translate(_brdRatingX + 8, BY + IH/2 + BORDER/2);
+    ctx.rotate(Math.PI/2);
+    ctx.font='8px Courier New'; ctx.fillStyle='rgba(168,170,232,0.85)';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(_levelLabel(players.black.rating) + '  ' + players.black.rating, 0, 0);
+    ctx.restore();
   }
+  // White — bottom border
+  ctx.fillStyle='#d0b880'; ctx.font='bold 14px Courier New'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(players.white.name.substring(0,12), _brdNameL, IY+IH+10);
   drawCanvasFlag(players.white.flag, _brdRight - _brdFW, IY+IH+1, _brdFW, _brdFH);
+  if (myRole && players.white.rating) {
+    ctx.save();
+    ctx.translate(_brdRatingX + 8, IY + IH + BORDER/2);
+    ctx.rotate(Math.PI/2);
+    ctx.font='8px Courier New'; ctx.fillStyle='rgba(208,184,128,0.85)';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(_levelLabel(players.white.rating) + '  ' + players.white.rating, 0, 0);
+    ctx.restore();
+  }
   ctx.textBaseline='alphabetic';
 }
 
