@@ -4146,12 +4146,7 @@ function drawMedallion() {
 }
 
 function drawQuadrantLabels() {
-  ctx.font='10px Courier New'; ctx.fillStyle=C.labelDim; ctx.textAlign='center';
-  const mL=IX+HALF_W/2, mR=IX+HALF_W+BAR_W+HALF_W/2;
-  ctx.fillText("BLACK'S HOME (19–24)",  mR, IY+IH*.22);
-  ctx.fillText("BLACK'S OUTER (13–18)", mL, IY+IH*.22);
-  ctx.fillText("WHITE'S OUTER (7–12)",  mL, IY+IH*.80);
-  ctx.fillText("WHITE'S HOME (1–6)",    mR, IY+IH*.80);
+  // Labels removed — too small to read and not necessary
 }
 
 function drawPointLabels() {
