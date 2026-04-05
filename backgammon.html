@@ -4273,7 +4273,7 @@ function drawBoard() {
   // Black rating — rotated in right border, upper quarter
   if (myRole && players.black.rating) {
     ctx.save();
-    ctx.translate(_brdRatingCX, BY + BORDER + 50);
+    ctx.translate(_brdRatingCX, BY + BORDER + 85);
     ctx.rotate(Math.PI/2);
     ctx.font='11px Courier New'; ctx.fillStyle='rgba(168,170,232,0.85)';
     ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -4287,7 +4287,7 @@ function drawBoard() {
   // White rating — rotated in right border, lower quarter
   if (myRole && players.white.rating) {
     ctx.save();
-    ctx.translate(_brdRatingCX, IY + IH - 85);
+    ctx.translate(_brdRatingCX, IY + IH - 50);
     ctx.rotate(Math.PI/2);
     ctx.font='11px Courier New'; ctx.fillStyle='rgba(208,184,128,0.85)';
     ctx.textAlign='center'; ctx.textBaseline='middle';
