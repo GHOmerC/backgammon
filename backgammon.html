@@ -4287,7 +4287,7 @@ function drawBoard() {
   // White rating — rotated in right border, lower quarter
   if (myRole && players.white.rating) {
     ctx.save();
-    ctx.translate(_brdRatingCX, IY + IH - 50);
+    ctx.translate(_brdRatingCX, IY + IH - 85);
     ctx.rotate(Math.PI/2);
     ctx.font='11px Courier New'; ctx.fillStyle='rgba(208,184,128,0.85)';
     ctx.textAlign='center'; ctx.textBaseline='middle';
