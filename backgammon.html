@@ -691,7 +691,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v8.29-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v8.30-MP</p>
     <p style="font-size:12px; letter-spacing:1px; color:#c9983a; margin-bottom:10px;">✦ Free &nbsp;|&nbsp; No Ads &nbsp;|&nbsp; No Signup &nbsp;|&nbsp; Build Your Rating</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
@@ -1110,7 +1110,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v8.29-MP';
+const VERSION    = 'v8.30-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1326,7 +1326,7 @@ function _doRematch() {
       const accepts = Math.random() < 0.5;
       if (accepts) {
         if (btn) { btn.textContent = '⚔  REMATCH'; btn.disabled = false; }
-        _hideRematchBtn(); _aiThinking = false;
+        _hideRematchBtn(); _aiThinking = false; _aiFirstMovePlayed = false;
         _loopStarted = false; _launchGame();
       } else {
         if (btn) { btn.textContent = '⚔  REMATCH'; btn.disabled = false; }
@@ -1437,37 +1437,37 @@ let _aiSearchTimer = null; // fires after 10s of searching, falls back to AI opp
 // ── AI Roster (31 players, all share Albert's learned weights) ────────────────
 // windows: [[startHour, endHour], ...] in 24h. null = available all day.
 const _AI_ROSTER = [
-  { name: 'ShadowDrift',  flag: 'US', windows: [[0,3],[12,16]] },
-  { name: 'IronVex',      flag: 'US', windows: [[3,7],[16,20]] },
-  { name: 'NovaStrike',   flag: 'US', windows: [[7,12],[17,23]] },
-  { name: 'RiftHunter',   flag: 'US', windows: [[8,11],[20,24]] },
-  { name: 'BlazeVector',  flag: 'US', windows: [[2,4],[18,24]] },
-  { name: 'NightRook',    flag: 'US', windows: [[21,24],[0,3]] },
-  { name: 'TitanPulse',   flag: 'US', windows: [[10,16],[18,23.83]] },
-  { name: 'GhostArc',     flag: 'US', windows: [[0,2],[16,20]] },
-  { name: 'VortexKnight', flag: 'US', windows: [[0,3],[20,23.98]] },
-  { name: 'EmberWolf',    flag: 'US', windows: [[8,12],[18,22]] },
-  { name: 'LunaVibe',     flag: 'US', windows: [[7,11],[21,23.67]] },
-  { name: 'NovaBloom',    flag: 'US', windows: [[1,4],[17,24]] },
-  { name: 'ShadowLily',   flag: 'US', windows: [[19,24],[0,3]] },
-  { name: 'VelvetHex',    flag: 'US', windows: [[11,16],[18,23.83]] },
-  { name: 'EmberFaye',    flag: 'US', windows: [[0,2],[16,20]] },
-  { name: 'CrystalVox',  flag: 'US', windows: [[0,3],[20,23.98]] },
-  { name: 'AstraNyx',     flag: 'US', windows: [[8,12],[18,22]] },
-  { name: 'MysticRaven',  flag: 'US', windows: [[7,11],[21,23.67]] },
-  { name: 'EchoSiren',    flag: 'US', windows: [[1,4],[17,24]] },
-  { name: 'FrostPetal',   flag: 'US', windows: [[19,24],[0,3]] },
-  { name: 'Liam',         flag: 'US', windows: [[0,3],[12,16]] },
-  { name: 'Noah',         flag: 'US', windows: [[3,7],[16,20]] },
-  { name: 'Oliver',       flag: 'US', windows: [[7,12],[17,23]] },
-  { name: 'James',        flag: 'US', windows: [[8,11],[20,24]] },
-  { name: 'Elijah',       flag: 'US', windows: [[2,4],[18,24]] },
-  { name: 'Olivia',       flag: 'US', windows: [[21,24],[0,3]] },
-  { name: 'Emma',         flag: 'US', windows: [[10,16],[18,23.83]] },
-  { name: 'Charlotte',    flag: 'US', windows: [[0,2],[16,20]] },
-  { name: 'Amelia',       flag: 'US', windows: [[0,3],[20,23.98]] },
-  { name: 'Sophia',       flag: 'US', windows: [[8,12],[18,22]] },
-  { name: 'Albert',       flag: 'US', windows: null }, // available all day
+  { name: 'ShadowDrift',  flag: 'US', windows: [[0,3],[12,16]],    style: 'aggressive' },
+  { name: 'IronVex',      flag: 'US', windows: [[3,7],[16,20]],    style: 'defensive'  },
+  { name: 'NovaStrike',   flag: 'US', windows: [[7,12],[17,23]],   style: 'aggressive' },
+  { name: 'RiftHunter',   flag: 'US', windows: [[8,11],[20,24]],   style: 'defensive'  },
+  { name: 'BlazeVector',  flag: 'US', windows: [[2,4],[18,24]],    style: 'aggressive' },
+  { name: 'NightRook',    flag: 'US', windows: [[21,24],[0,3]],    style: 'defensive'  },
+  { name: 'TitanPulse',   flag: 'US', windows: [[10,16],[18,23.83]], style: null },
+  { name: 'GhostArc',     flag: 'US', windows: [[0,2],[16,20]],    style: null },
+  { name: 'VortexKnight', flag: 'US', windows: [[0,3],[20,23.98]], style: null },
+  { name: 'EmberWolf',    flag: 'US', windows: [[8,12],[18,22]],   style: null },
+  { name: 'LunaVibe',     flag: 'US', windows: [[7,11],[21,23.67]], style: null },
+  { name: 'NovaBloom',    flag: 'US', windows: [[1,4],[17,24]],    style: null },
+  { name: 'ShadowLily',   flag: 'US', windows: [[19,24],[0,3]],    style: null },
+  { name: 'VelvetHex',    flag: 'US', windows: [[11,16],[18,23.83]], style: null },
+  { name: 'EmberFaye',    flag: 'US', windows: [[0,2],[16,20]],    style: null },
+  { name: 'CrystalVox',  flag: 'US', windows: [[0,3],[20,23.98]], style: null },
+  { name: 'AstraNyx',     flag: 'US', windows: [[8,12],[18,22]],   style: null },
+  { name: 'MysticRaven',  flag: 'US', windows: [[7,11],[21,23.67]], style: null },
+  { name: 'EchoSiren',    flag: 'US', windows: [[1,4],[17,24]],    style: null },
+  { name: 'FrostPetal',   flag: 'US', windows: [[19,24],[0,3]],    style: null },
+  { name: 'Liam',         flag: 'US', windows: [[0,3],[12,16]],    style: 'aggressive' },
+  { name: 'Noah',         flag: 'US', windows: [[3,7],[16,20]],    style: 'defensive'  },
+  { name: 'Oliver',       flag: 'US', windows: [[7,12],[17,23]],   style: 'aggressive' },
+  { name: 'James',        flag: 'US', windows: [[8,11],[20,24]],   style: 'defensive'  },
+  { name: 'Elijah',       flag: 'US', windows: [[2,4],[18,24]],    style: 'aggressive' },
+  { name: 'Olivia',       flag: 'US', windows: [[21,24],[0,3]],    style: 'defensive'  },
+  { name: 'Emma',         flag: 'US', windows: [[10,16],[18,23.83]], style: null },
+  { name: 'Charlotte',    flag: 'US', windows: [[0,2],[16,20]],    style: null },
+  { name: 'Amelia',       flag: 'US', windows: [[0,3],[20,23.98]], style: null },
+  { name: 'Sophia',       flag: 'US', windows: [[8,12],[18,22]],   style: null },
+  { name: 'Albert',       flag: 'US', windows: null,               style: null }, // available all day
 ];
 
 function _aiIsActive(player) {
@@ -3208,6 +3208,8 @@ async function _startAIGame(aiName, aiFlag, aiRating, difficulty, preName = null
   }
   _isAI = true; _aiRole = 'black'; _aiDifficulty = difficulty;
   myRole = 'white'; _fbRoom = null; _isRankedGame = true;
+  _currentAIPlayer = _AI_ROSTER.find(p => p.name === aiName) || null;
+  _aiFirstMovePlayed = false;
   const storedAiRating = _loadAIRating(aiName);
   players.white = { name, flag, rating: _myRating, level: _levelLabel(_myRating) };
   players.black = { name: aiName, flag: aiFlag, rating: storedAiRating, level: _levelLabel(storedAiRating) };
@@ -3525,13 +3527,126 @@ function _waitForAnim() {
   });
 }
 
+// ── Opening book (enforced first move by personality) ─────────────────────────
+let _aiFirstMovePlayed = false;
+let _currentAIPlayer = null; // set when AI game starts, holds roster entry
+
+const _OPENING_BOOK = {
+  aggressive: {
+    '1,1': [{from:6,to:5},{from:6,to:5},{from:8,to:7},{from:8,to:7}],
+    '1,2': [{from:13,to:11},{from:11,to:10}],
+    '1,3': [{from:8,to:5},{from:6,to:5}],
+    '1,4': [{from:13,to:9},{from:9,to:8}],
+    '1,5': [{from:13,to:8},{from:24,to:23}],
+    '1,6': [{from:13,to:7},{from:8,to:7}],
+    '2,2': [{from:6,to:4},{from:6,to:4},{from:13,to:11},{from:13,to:11}],
+    '2,3': [{from:13,to:10},{from:10,to:8}],
+    '2,4': [{from:8,to:4},{from:6,to:4}],
+    '2,5': [{from:13,to:8},{from:13,to:11}],
+    '2,6': [{from:13,to:11},{from:24,to:18}],
+    '3,3': [{from:6,to:3},{from:6,to:3},{from:13,to:10},{from:13,to:10}],
+    '3,4': [{from:13,to:10},{from:24,to:20}],
+    '3,5': [{from:6,to:3},{from:8,to:3}],
+    '3,6': [{from:13,to:10},{from:24,to:18}],
+    '4,4': [{from:13,to:9},{from:13,to:9},{from:9,to:5},{from:9,to:5}],
+    '4,5': [{from:13,to:8},{from:13,to:9}],
+    '4,6': [{from:24,to:18},{from:13,to:9}],
+    '5,5': [{from:13,to:8},{from:13,to:8},{from:8,to:3},{from:8,to:3}],
+    '5,6': [{from:13,to:8},{from:24,to:18}],
+    '6,6': [{from:24,to:18},{from:24,to:18},{from:13,to:7},{from:13,to:7}],
+    '2,1': [{from:13,to:11},{from:11,to:10}],
+    '3,1': [{from:8,to:5},{from:6,to:5}],
+    '4,1': [{from:13,to:9},{from:9,to:8}],
+    '5,1': [{from:13,to:8},{from:24,to:23}],
+    '6,1': [{from:13,to:7},{from:8,to:7}],
+    '3,2': [{from:13,to:10},{from:10,to:8}],
+    '4,2': [{from:8,to:4},{from:6,to:4}],
+    '5,2': [{from:13,to:8},{from:13,to:11}],
+    '6,2': [{from:13,to:11},{from:24,to:18}],
+    '4,3': [{from:13,to:10},{from:24,to:20}],
+    '5,3': [{from:6,to:3},{from:8,to:3}],
+    '6,3': [{from:13,to:10},{from:24,to:18}],
+    '5,4': [{from:13,to:8},{from:13,to:9}],
+    '6,4': [{from:24,to:18},{from:13,to:9}],
+    '6,5': [{from:13,to:8},{from:24,to:18}],
+  },
+  defensive: {
+    '1,1': [{from:6,to:5},{from:6,to:5},{from:24,to:23},{from:23,to:21}],
+    '1,2': [{from:24,to:23},{from:23,to:21}],
+    '1,3': [{from:8,to:5},{from:6,to:5}],
+    '1,4': [{from:24,to:20},{from:24,to:23}],
+    '1,5': [{from:24,to:23},{from:23,to:18}],
+    '1,6': [{from:13,to:7},{from:8,to:7}],
+    '2,1': [{from:24,to:23},{from:23,to:21}],
+    '2,2': [{from:6,to:4},{from:6,to:4},{from:24,to:22},{from:24,to:22}],
+    '2,3': [{from:13,to:10},{from:10,to:8}],
+    '2,4': [{from:8,to:4},{from:6,to:4}],
+    '2,5': [{from:13,to:8},{from:24,to:22}],
+    '2,6': [{from:24,to:22},{from:24,to:18}],
+    '3,1': [{from:8,to:5},{from:6,to:5}],
+    '3,2': [{from:24,to:22},{from:24,to:21}],
+    '3,3': [{from:6,to:3},{from:6,to:3},{from:24,to:21},{from:24,to:21}],
+    '3,4': [{from:24,to:21},{from:24,to:20}],
+    '3,5': [{from:6,to:3},{from:8,to:3}],
+    '3,6': [{from:24,to:21},{from:24,to:18}],
+    '4,1': [{from:24,to:20},{from:24,to:23}],
+    '4,2': [{from:8,to:4},{from:6,to:4}],
+    '4,3': [{from:24,to:21},{from:24,to:20}],
+    '4,4': [{from:13,to:9},{from:13,to:9},{from:24,to:20},{from:24,to:20}],
+    '4,5': [{from:24,to:20},{from:13,to:9}],
+    '4,6': [{from:24,to:18},{from:24,to:20}],
+    '5,1': [{from:24,to:23},{from:23,to:18}],
+    '5,2': [{from:13,to:8},{from:24,to:22}],
+    '5,3': [{from:6,to:3},{from:8,to:3}],
+    '5,4': [{from:24,to:20},{from:13,to:9}],
+    '5,5': [{from:13,to:8},{from:13,to:8},{from:8,to:3},{from:8,to:3}],
+    '5,6': [{from:24,to:18},{from:18,to:13}],
+    '6,1': [{from:13,to:7},{from:8,to:7}],
+    '6,2': [{from:24,to:22},{from:24,to:18}],
+    '6,3': [{from:24,to:21},{from:24,to:18}],
+    '6,4': [{from:24,to:18},{from:24,to:20}],
+    '6,5': [{from:24,to:18},{from:18,to:13}],
+    '6,6': [{from:24,to:18},{from:24,to:18},{from:13,to:7},{from:13,to:7}],
+    '3,1': [{from:8,to:5},{from:6,to:5}],
+    '4,1': [{from:24,to:20},{from:24,to:23}],
+    '5,1': [{from:24,to:23},{from:23,to:18}],
+    '6,1': [{from:13,to:7},{from:8,to:7}],
+    '4,2': [{from:8,to:4},{from:6,to:4}],
+    '5,2': [{from:13,to:8},{from:24,to:22}],
+    '6,2': [{from:24,to:22},{from:24,to:18}],
+    '4,3': [{from:24,to:21},{from:24,to:20}],
+    '5,3': [{from:6,to:3},{from:8,to:3}],
+    '6,3': [{from:24,to:21},{from:24,to:18}],
+    '5,4': [{from:24,to:20},{from:13,to:9}],
+    '6,4': [{from:24,to:18},{from:24,to:20}],
+    '6,5': [{from:24,to:18},{from:18,to:13}],
+  }
+};
+
+function _getOpeningBookMoves() {
+  if (_aiFirstMovePlayed) return null;
+  const style = (_currentAIPlayer && _currentAIPlayer.style) || 'none';
+  if (style !== 'aggressive' && style !== 'defensive') return null;
+  const book = _OPENING_BOOK[style];
+  const key = movesLeft[0] + ',' + movesLeft[1]; // use dice as-rolled
+  return book[key] || null;
+}
+
 // Execute AI turn: pick best moves, apply them with smooth animation + realistic delays
 async function _aiExecuteTurn() {
-  const t0 = Date.now();
-  const {moves, thinkMs} = _aiPickBestMoves();
-  const elapsed = Date.now() - t0;
-  const remaining = Math.max(400, thinkMs - elapsed); // compute time counts as thinking
-  await new Promise(r=>setTimeout(r, remaining));
+  const bookMoves = _getOpeningBookMoves();
+  _aiFirstMovePlayed = true;
+  let moves, thinkMs;
+  if (bookMoves) {
+    moves = bookMoves;
+    thinkMs = 1500 + Math.random() * 1000;
+  } else {
+    const t0 = Date.now();
+    ({moves, thinkMs} = _aiPickBestMoves());
+    const elapsed = Date.now() - t0;
+    thinkMs = Math.max(400, thinkMs - elapsed);
+  }
+  await new Promise(r=>setTimeout(r, thinkMs));
   for (const mv of moves) {
     if (phase==='gameover' || currentPlayer!==_aiRole) break;
     executeMove(mv.from, mv.to);   // triggers smooth checkerAnim
