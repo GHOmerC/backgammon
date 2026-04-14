@@ -700,7 +700,7 @@
 <div id="setup-overlay">
   <div id="setup-box">
     <h2>BACKGAMMON</h2>
-    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v8.47-MP</p>
+    <p id="version-label" style="font-size:11px; letter-spacing:2px; color:#7a6030; margin-bottom:4px; margin-top:-4px;">v8.50-MP</p>
     <p style="font-size:12px; letter-spacing:1px; color:#c9983a; margin-bottom:10px;">✦ Free &nbsp;|&nbsp; No Ads &nbsp;|&nbsp; No Signup &nbsp;|&nbsp; Build Your Rating</p>
     <p>ENTER YOUR NAME TO BEGIN</p>
     <div class="setup-row">
@@ -1119,7 +1119,7 @@ let _myPlayerKey = '';
 let _applyingRemote = false;
 const _myId      = Math.random().toString(36).slice(2, 10); // unique client ID
 let   _sessionId = '';   // set by White on create; Black reads from first state push
-const VERSION    = 'v8.47-MP';
+const VERSION    = 'v8.50-MP';
 
 function _fbInit() {
   if (_fbDb) return;
@@ -1645,6 +1645,8 @@ function _backToSearching(name, flag) {
 }
 
 function _startMatchListeners(name, flag, myKey) {
+  // Cancel any leftover poll interval from a previous search round
+  if (_matchPollInterval) { clearInterval(_matchPollInterval); _matchPollInterval = null; }
   // All coordination happens via matchQueue entries — no separate Firebase path needed.
   // White writes match info directly into Black's queue entry to wake it up.
   let acceptShown = false;
@@ -1655,7 +1657,7 @@ function _startMatchListeners(name, flag, myKey) {
     if (!d) return;
 
     // Phase 1: White found us — show accept prompt (once)
-    if (d.pendingWhiteKey && !acceptShown) {
+    if (d.pendingWhiteKey && d.pendingWhiteKey !== 'self' && !acceptShown) {
       acceptShown = true;
       const whiteKey = d.pendingWhiteKey;
       const oppName = d.pendingWhiteName || '?';
@@ -4251,13 +4253,43 @@ function drawDiceArea() {
   }
 
   const isW = currentPlayer==='white';
-  ctx.fillStyle=isW?'rgba(240,220,160,0.22)':'rgba(30,32,48,0.65)';
-  roundRect(bX,bY,bW,bH,bR); ctx.fill();
-  ctx.strokeStyle=isW?C.wEdge:C.bInner; ctx.lineWidth=1.5; roundRect(bX,bY,bW,bH,bR); ctx.stroke();
-  ctx.fillStyle=isW?'#f8e8a0':'#d0d0ff'; ctx.font='bold 14px Courier New'; ctx.textAlign='center';
+  // ── Checker-style glossy pill ──
+  ctx.save();
+  ctx.shadowColor = isW ? 'rgba(180,140,60,0.5)' : 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+  // Base fill — radial gradient like a checker surface
+  const _pillGrad = ctx.createLinearGradient(bX, bY, bX, bY+bH);
+  if (isW) {
+    _pillGrad.addColorStop(0, '#fffff4');
+    _pillGrad.addColorStop(0.35, C.wInner);
+    _pillGrad.addColorStop(0.7, C.wBase);
+    _pillGrad.addColorStop(1, C.wEdge);
+  } else {
+    _pillGrad.addColorStop(0, '#3a3d55');
+    _pillGrad.addColorStop(0.3, C.bInner);
+    _pillGrad.addColorStop(0.7, C.bBase);
+    _pillGrad.addColorStop(1, C.bEdge);
+  }
+  roundRect(bX, bY, bW, bH, bR); ctx.fillStyle = _pillGrad; ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  // Rim stroke
+  ctx.strokeStyle = isW ? C.wEdge : '#505370'; ctx.lineWidth = 1.5;
+  roundRect(bX, bY, bW, bH, bR); ctx.stroke();
+  // Gloss arc highlight (top quarter)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(bX, bY, bW, bH * 0.52); ctx.clip();
+  const _gloss = ctx.createLinearGradient(bX, bY, bX, bY + bH * 0.52);
+  _gloss.addColorStop(0, isW ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.18)');
+  _gloss.addColorStop(1, 'rgba(255,255,255,0)');
+  roundRect(bX+2, bY+2, bW-4, bH-4, bR-1); ctx.fillStyle = _gloss; ctx.fill();
+  ctx.restore();
+  // Text
+  ctx.fillStyle = isW ? '#1a1208' : '#e8e8ff';
+  ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const _pn = isW ? players.white : players.black;
   const _colorWord = isW ? 'white' : 'black';
-  ctx.fillText(_pn.name.substring(0,12) + ' plays ' + _colorWord, bX+bW/2, bY+18);
+  ctx.fillText(_pn.name.substring(0,12) + ' plays ' + _colorWord, bX+bW/2, bY+bH/2);
+  ctx.restore();
 
   if (phase==='idle' && isMyTurn() && Math.floor(time/30)%2===0) {
     ctx.fillStyle=C.labelDim; ctx.font='bold 22px Courier New'; ctx.textAlign='center';
@@ -5124,20 +5156,36 @@ function drawBoard() {
     ctx.strokeStyle=C.ptGoldHi; ctx.lineWidth=2; roundRect(gcx-210,gcy-65,420,155,12); ctx.stroke();
     ctx.fillStyle=C.ptGoldHi; ctx.font='bold 28px Courier New'; ctx.textAlign='center';
     ctx.fillText(statusMsg,gcx,gcy-22);
-    // White player row — flag | name | (safe drawn by drawBillSafeAnim) | score
-    if (players.white.flag) drawCanvasFlag(players.white.flag, gcx-200, gcy+2, 38, 25);
-    const _wNameX = players.white.flag ? gcx-153 : gcx-200;
-    ctx.font='bold 16px Courier New'; ctx.textAlign='left';
-    ctx.fillStyle=C.wBase; ctx.fillText(players.white.name.substring(0,9)+' (white)', _wNameX, gcy+18);
-    ctx.font = (myRole && !_isRankedGame) ? 'bold 14px Courier New' : 'bold 22px Courier New';
-    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='white' ? 'Win' : 'Loss') : gameScore.white, gcx+148, gcy+18);
-    // Black player row
-    if (players.black.flag) drawCanvasFlag(players.black.flag, gcx-200, gcy+38, 38, 25);
-    const _bNameX = players.black.flag ? gcx-153 : gcx-200;
-    ctx.font='bold 16px Courier New'; ctx.textAlign='left';
-    ctx.fillStyle='#c8ccff'; ctx.fillText(players.black.name.substring(0,9)+' (black)', _bNameX, gcy+54);
-    ctx.font = (myRole && !_isRankedGame) ? 'bold 14px Courier New' : 'bold 22px Courier New';
-    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='black' ? 'Win' : 'Loss') : gameScore.black, gcx+148, gcy+54);
+    // ── White player row — checker-textured background ──
+    const _rowW = 408, _rowH = 32, _rowX = gcx - 204, _rowR = 7;
+    const _wRowY = gcy + 2;
+    const _wGrad = ctx.createLinearGradient(_rowX, _wRowY, _rowX + _rowW, _wRowY + _rowH);
+    _wGrad.addColorStop(0, C.wInner); _wGrad.addColorStop(0.5, C.wBase); _wGrad.addColorStop(1, C.wEdge);
+    roundRect(_rowX, _wRowY, _rowW, _rowH, _rowR); ctx.fillStyle = _wGrad; ctx.fill();
+    ctx.strokeStyle = C.wEdge; ctx.lineWidth = 1.5;
+    roundRect(_rowX, _wRowY, _rowW, _rowH, _rowR); ctx.stroke();
+    if (players.white.flag) drawCanvasFlag(players.white.flag, _rowX + 6, _wRowY + 4, 32, 21);
+    const _wNameX = players.white.flag ? _rowX + 44 : _rowX + 8;
+    ctx.font='bold 15px Courier New'; ctx.textAlign='left'; ctx.fillStyle='#1a1208';
+    ctx.fillText(players.white.name.substring(0,9)+' (white)', _wNameX, _wRowY + 21);
+    ctx.font = (myRole && !_isRankedGame) ? 'bold 13px Courier New' : 'bold 20px Courier New';
+    ctx.textAlign='right';
+    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='white' ? 'Win' : 'Loss') : gameScore.white, _rowX + _rowW - 8, _wRowY + 22);
+
+    // ── Black player row — dark checker-textured background ──
+    const _bRowY = gcy + 42;
+    const _bGrad = ctx.createLinearGradient(_rowX, _bRowY, _rowX + _rowW, _bRowY + _rowH);
+    _bGrad.addColorStop(0, C.bInner); _bGrad.addColorStop(0.5, C.bBase); _bGrad.addColorStop(1, C.bEdge);
+    roundRect(_rowX, _bRowY, _rowW, _rowH, _rowR); ctx.fillStyle = _bGrad; ctx.fill();
+    ctx.strokeStyle = C.bInner; ctx.lineWidth = 1.5;
+    roundRect(_rowX, _bRowY, _rowW, _rowH, _rowR); ctx.stroke();
+    if (players.black.flag) drawCanvasFlag(players.black.flag, _rowX + 6, _bRowY + 4, 32, 21);
+    const _bNameX = players.black.flag ? _rowX + 44 : _rowX + 8;
+    ctx.font='bold 15px Courier New'; ctx.textAlign='left'; ctx.fillStyle='#e8e8ff';
+    ctx.fillText(players.black.name.substring(0,9)+' (black)', _bNameX, _bRowY + 21);
+    ctx.font = (myRole && !_isRankedGame) ? 'bold 13px Courier New' : 'bold 20px Courier New';
+    ctx.textAlign='right'; ctx.fillStyle='#e8e8ff';
+    ctx.fillText((myRole && !_isRankedGame) ? (_gameWinner==='black' ? 'Win' : 'Loss') : gameScore.black, _rowX + _rowW - 8, _bRowY + 22);
     ctx.font='11px Courier New'; ctx.fillStyle=C.labelDim; ctx.textAlign='center';
     ctx.fillText('Press  R  to play again',gcx,gcy+80);
     if (myRole && !_isRankedGame && !statusMsg.includes('FORFEIT')) {
