@@ -2543,10 +2543,22 @@ const DICE_FILES = ['Dice rolling 1.m4a','Dice rolling 2.m4a','Dice rolling 3.m4
 // Two pooled instances per file so overlapping rolls never cut each other off
 let diceAudioPool = null;
 let _safeCloseAudio = null;
+let _diceGain = null;
 function loadDiceAudioBuffers() { // called on Start — pre-create pool so first roll has no delay
   if (diceAudioPool) return;
   diceAudioPool = DICE_FILES.flatMap(f => [new Audio(f), new Audio(f)]);
-  diceAudioPool.forEach(a => { a.volume = 1.0; a.load(); });
+  // Route through Web Audio GainNode to boost beyond the 1.0 HTML volume cap
+  if (_ac) {
+    _diceGain = _ac.createGain();
+    _diceGain.gain.value = 1.5;
+    _diceGain.connect(_ac.destination);
+    diceAudioPool.forEach(a => {
+      a.load();
+      try { _ac.createMediaElementSource(a).connect(_diceGain); } catch(e) {}
+    });
+  } else {
+    diceAudioPool.forEach(a => { a.volume = 1.0; a.load(); });
+  }
   _safeCloseAudio = new Audio('Safe closed.m4a');
   _safeCloseAudio.load();
 }
